@@ -64,6 +64,15 @@ export default function App() {
   // それぞれ grid-area を自己申告するため、中間の wrapper div は不要になった。
   return (
     <div className={styles.app}>
+      {/* ===== Ambient background blobs (item 6: bg-decoration-family)
+       *   aria-hidden: 純粋な装飾レイヤー。pointer-events: none (global.css)。
+       *   z-index: 0 で UI より背面。bgBlob1/2 は global.css で定義。
+       * ===== */}
+      <div className={styles.bgAmbient} aria-hidden="true">
+        <span className={styles.bgBlob1} />
+        <span className={styles.bgBlob2} />
+      </div>
+
       <Header
         projectName={project.projectName}
         onProjectNameChange={setProjectName}
