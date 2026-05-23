@@ -121,9 +121,15 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
         })}
       </ul>
 
-      {/* ===== Footer: decorative version badge ===== */}
+      {/* ===== Footer: decorative version badge + hero-pulse dot (linear-app / bg-decoration-family)
+       *   aria-hidden: 純粋な装飾。スクリーンリーダーには読まれない。
+       *   heroPulseDot: 小さな cyan 脈動ドットで「動作してる感」を演出。
+       * ===== */}
       <div className={styles.sidebarFooter} aria-hidden="true">
-        <span>YMM4 Script Editor</span>
+        <span style={{ display: "flex", alignItems: "center" }}>
+          <span className={styles.heroPulseDot} />
+          YMM4 Script Editor
+        </span>
         <span className={styles.ver}>v0.1</span>
       </div>
     </aside>

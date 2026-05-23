@@ -239,3 +239,31 @@
   background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.25));
 }
 .ver { font-family: var(--font-mono); }
+
+/* ===== hero-pulse ドット (linear-app / bg-decoration-family)
+ * box-shadow 0→10px rgba(...,0) を 1.75s cubic-bezier(.66,0,0,1) infinite で脈動。
+ * 「動作してる感」を出す小さな cyan 脈動ドット。
+ * aria-hidden は JSX 側で設定。prefers-reduced-motion で停止。
+ */
+.heroPulseDot {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgba(43, 180, 230, 0.7);
+  margin-right: 7px;
+  flex-shrink: 0;
+  /* hero-pulse: box-shadow 脈動アニメーション */
+  animation: heroPulse 1.75s cubic-bezier(0.66, 0, 0, 1) infinite;
+}
+
+@keyframes heroPulse {
+  0%   { box-shadow: 0 0 0 0 rgba(43, 180, 230, 0.45); }
+  70%  { box-shadow: 0 0 0 7px rgba(43, 180, 230, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(43, 180, 230, 0); }
+}
+
+/* prefers-reduced-motion: hero-pulse を停止 */
+@media (prefers-reduced-motion: reduce) {
+  .heroPulseDot { animation: none; }
+}

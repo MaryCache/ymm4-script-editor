@@ -3,9 +3,16 @@ import { useProject } from "./hooks/useProject";
 import { Header } from "./components/Header/Header";
 import { CharacterPanel } from "./components/CharacterPanel/CharacterPanel";
 import { ScriptEditor } from "./components/ScriptEditor/ScriptEditor";
+import { BgCanvas } from "./components/BgCanvas/BgCanvas";
+import { OpeningOverlay } from "./components/OpeningOverlay/OpeningOverlay";
 import { buildLineCSV } from "./utils/csv";
 import type { Line } from "./types";
 import styles from "./App.module.css";
+
+// marquee-scroll (linear-app / bg-decoration-family) のテキスト。
+// 繰り返しパターンを一定幅に設定し、シームレスループを作る。
+// アスキー記号 ▸ はモノスペースフォントで等幅に近いため採用。
+const MARQUEE_TEXT = "YMM4 ▸ SCRIPT ▸ EDITOR ▸ YMM4台本エディタ ▸ ";
 
 export default function App() {
   const {
@@ -63,43 +70,74 @@ export default function App() {
   // App shell は CSS Grid (.app)。Header / CharacterPanel / ScriptEditor が
   // それぞれ grid-area を自己申告するため、中間の wrapper div は不要になった。
   return (
-    <div className={styles.app}>
-      {/* ===== Ambient background blobs (item 6: bg-decoration-family)
-       *   aria-hidden: 純粋な装飾レイヤー。pointer-events: none (global.css)。
-       *   z-index: 0 で UI より背面。bgBlob1/2 は global.css で定義。
+    <>
+      {/* ===== Opening overlay (opening-sequence / cygames + loading-family)
+       *   コンテンツ (.app) より上に重ねるだけ。DOM は最初から存在し描画遅延なし。
+       *   aria-hidden + pointer-events:none。reduced-motion / 2回目以降は null を返す。
        * ===== */}
-      <div className={styles.bgAmbient} aria-hidden="true">
-        <span className={styles.bgBlob1} />
-        <span className={styles.bgBlob2} />
-      </div>
+      <OpeningOverlay />
 
-      <Header
-        projectName={project.projectName}
-        onProjectNameChange={setProjectName}
-        onSaveYmscript={saveToFile}
-        onSaveMarkdown={exportMarkdown}
-        onExportCSV={exportCSV}
-        onLoadYmscript={loadYmscript}
-        onLoadMarkdown={importMarkdown}
-        onCopyAll={onCopyAll}
-      />
-      <CharacterPanel
-        characters={project.characters}
-        onAdd={addCharacter}
-        onDelete={deleteCharacter}
-      />
-      <ScriptEditor
-        characters={project.characters}
-        lines={project.lines}
-        onAddLine={addLineAtEnd}
-        onCharacterChange={updateLineCharacter}
-        onTextChange={updateLineText}
-        onMoveUp={onMoveUp}
-        onMoveDown={onMoveDown}
-        onAddAfter={addLineAfter}
-        onDelete={deleteLine}
-        onCopy={copyLine}
-      />
-    </div>
+      <div className={styles.app}>
+        {/* ===== Ambient background layer (bg-decoration-family)
+         *   aria-hidden: 純粋な装飾レイヤー。pointer-events: none (CSS)。
+         *   z-index: 0 で UI より背面。
+         *   内包:
+         *     bgBlob1/2 — glass-fade 強化ブロブ (blur + mask-image)
+         *     BgCanvas  — canvas-gyro 代替 (vanilla canvas, 依存ゼロ)
+         *     marqueeTrack — marquee-scroll (linear-app)
+         * ===== */}
+        <div className={styles.bgAmbient} aria-hidden="true">
+          {/* glass-fade 強化ブロブ: filter:blur + mask-image で柔らかい発光 */}
+          <span className={styles.bgBlob1} />
+          <span className={styles.bgBlob2} />
+
+          {/* canvas-gyro 代替: vanilla canvas で粒子視差を描画。
+           *  reduced-motion / document.hidden 時は rAF 停止。
+           *  unmount で全リスナ解除。 */}
+          <BgCanvas />
+
+          {/* marquee-scroll (linear-app / bg-decoration-family)
+           *  巨大で極薄の cyan モノスペース文字帯を横方向に無限スクロール。
+           *  2本の .marqueeText を並べてシームレスループ。CSS のみ (JS 不要)。
+           *  opacity は .marqueeInner で制御 (0.028)。aria-hidden は親 bgAmbient が担う。
+           */}
+          <div className={styles.marqueeTrack}>
+            <div className={styles.marqueeInner}>
+              {/* 2本並べることでシームレスループ: translateX(-50%) で左半分分移動 */}
+              <span className={styles.marqueeText}>{MARQUEE_TEXT.repeat(8)}</span>
+              <span className={styles.marqueeText}>{MARQUEE_TEXT.repeat(8)}</span>
+            </div>
+          </div>
+        </div>
+
+        <Header
+          projectName={project.projectName}
+          onProjectNameChange={setProjectName}
+          onSaveYmscript={saveToFile}
+          onSaveMarkdown={exportMarkdown}
+          onExportCSV={exportCSV}
+          onLoadYmscript={loadYmscript}
+          onLoadMarkdown={importMarkdown}
+          onCopyAll={onCopyAll}
+        />
+        <CharacterPanel
+          characters={project.characters}
+          onAdd={addCharacter}
+          onDelete={deleteCharacter}
+        />
+        <ScriptEditor
+          characters={project.characters}
+          lines={project.lines}
+          onAddLine={addLineAtEnd}
+          onCharacterChange={updateLineCharacter}
+          onTextChange={updateLineText}
+          onMoveUp={onMoveUp}
+          onMoveDown={onMoveDown}
+          onAddAfter={addLineAfter}
+          onDelete={deleteLine}
+          onCopy={copyLine}
+        />
+      </div>
+    </>
   );
 }
