@@ -1,5 +1,13 @@
 // src/components/Header/Header.tsx
-import { useRef, useCallback, type ChangeEvent, type MouseEvent } from "react";
+import {
+  useState,
+  useRef,
+  useCallback,
+  useEffect,
+  type ChangeEvent,
+  type KeyboardEvent,
+  type MouseEvent,
+} from "react";
 import styles from "./Header.module.css";
 
 export type HeaderProps = {
@@ -13,16 +21,28 @@ export type HeaderProps = {
   onCopyAll: () => void;
 };
 
-// メニュー操作後に親の <details> を閉じる。
-// <details> はキーボード操作可能な disclosure として使っているが、
-// ボタンを押した後もメニューが開いたままになるのを防ぐためクローズする。
-// runAndCloseMenu は props 由来の安定関数のみを受け取る（ref を捕捉した関数は渡さない）ため、
-// レンダー中に ref を読む心配がなく react-hooks/refs に抵触しない。
-function runAndCloseMenu(action: () => void) {
-  return (e: MouseEvent<HTMLButtonElement>) => {
-    action();
-    e.currentTarget.closest("details")?.removeAttribute("open");
-  };
+// openMenu の型: 保存/読込 の排他制御に使う（item 5）。
+type OpenMenu = "save" | "load" | null;
+
+// メニュー外クリック検知: 対象 ref の外側を mousedown した時に onClose を呼ぶ。
+// Why mousedown (not click): click はポップアップ内ボタンの action 後にも伝播し得るが、
+// mousedown は action より先に発火するため「外をクリックして閉じる」に適している。
+// enabled フラグで無効時はリスナーを登録しない（パフォーマンス最適化）。
+function useOutsideClick(
+  ref: React.RefObject<HTMLElement | null>,
+  onClose: () => void,
+  enabled: boolean,
+) {
+  useEffect(() => {
+    if (!enabled) return;
+    const handler = (e: globalThis.MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) {
+        onClose();
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [ref, onClose, enabled]);
 }
 
 export function Header(props: HeaderProps) {
@@ -39,20 +59,54 @@ export function Header(props: HeaderProps) {
     projectName,
   } = props;
 
+  // ===== 排他メニュー制御 (item 5) =====
+  // openMenu が "save"/"load" の時のみ対応パネルを DOM に出す。
+  // 片方を開くともう片方は閉じる（setOpenMenu で上書き）。
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+
+  const headerRef = useRef<HTMLElement>(null);
+  const closeMenu = useCallback(() => setOpenMenu(null), []);
+
+  // メニュー外クリックで閉じる（item 5）
+  useOutsideClick(headerRef, closeMenu, openMenu !== null);
+
+  // Escape キーで閉じる（keyboard a11y）
+  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === "Escape") closeMenu();
+  }, [closeMenu]);
+
+  const toggleSave = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setOpenMenu((prev) => (prev === "save" ? null : "save"));
+  }, []);
+
+  const toggleLoad = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+    e.stopPropagation();
+    setOpenMenu((prev) => (prev === "load" ? null : "load"));
+  }, []);
+
+  // メニュー項目クリック: アクションを実行してメニューを閉じる。
+  // Why useCallback with inner factory: 各項目のクリックハンドラは異なる action を持つが、
+  // いずれも setOpenMenu(null) を呼ぶ共通処理を持つ。
+  const runAndClose = useCallback((action: () => void) => () => {
+    action();
+    setOpenMenu(null);
+  }, []);
+
+  // ===== Hidden file inputs =====
   const ymscriptInputRef = useRef<HTMLInputElement>(null);
   const markdownInputRef = useRef<HTMLInputElement>(null);
 
   // hidden file input をプログラムから開くのは標準的なパターン。
   // イベントハンドラ内の ref アクセスで安全（レンダー中に .current を読むわけではない）。
-  // openYmscriptPicker / openMarkdownPicker はメニューも閉じるため runAndCloseMenu を内包する。
-  const openYmscriptPicker = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+  const openYmscriptPicker = useCallback(() => {
     ymscriptInputRef.current?.click();
-    e.currentTarget.closest("details")?.removeAttribute("open");
+    setOpenMenu(null);
   }, []);
 
-  const openMarkdownPicker = useCallback((e: MouseEvent<HTMLButtonElement>) => {
+  const openMarkdownPicker = useCallback(() => {
     markdownInputRef.current?.click();
-    e.currentTarget.closest("details")?.removeAttribute("open");
+    setOpenMenu(null);
   }, []);
 
   // onChange ハンドラ: ファイルを handler に渡し、同じファイルの連続選択を可能にするため
@@ -72,7 +126,7 @@ export function Header(props: HeaderProps) {
   }, [onLoadMarkdown]);
 
   return (
-    <header className={styles.header}>
+    <header className={styles.header} ref={headerRef}>
       {/* ===== Left: brand mark + project name ===== */}
       <div className={styles.brand}>
         {/* aria-hidden: 純粋な装飾ロゴ。スクリーンリーダーに読ませない。 */}
@@ -89,30 +143,91 @@ export function Header(props: HeaderProps) {
       <div className={styles.spacer} />
 
       {/* ===== Right: action buttons ===== */}
-      <div className={styles.headerActions}>
+      {/* onKeyDown で Escape を捕捉してメニューを閉じる（a11y keyboard navigation） */}
+      <div className={styles.headerActions} onKeyDown={handleKeyDown}>
         {/* 全件コピー: primary variant で最重要 CTA として強調 */}
         <button className={styles.btnPrimary} onClick={onCopyAll}>全件コピー</button>
 
         <div className={styles.vSep} aria-hidden="true" />
 
-        {/* 保存メニュー */}
-        <details className={styles.menu}>
-          <summary>保存▼</summary>
-          <div className={styles.menuItems}>
-            <button onClick={runAndCloseMenu(onSaveYmscript)}>.ymscript として保存</button>
-            <button onClick={runAndCloseMenu(onSaveMarkdown)}>.md として保存</button>
-            <button onClick={runAndCloseMenu(onExportCSV)}>CSV を書き出す</button>
-          </div>
-        </details>
+        {/* ===== 保存メニュー (item 5) =====
+         * aria-haspopup="menu" + aria-expanded でスクリーンリーダーに状態を伝える。
+         * パネルは openMenu === "save" の時のみ DOM に出す
+         * （a11y: hidden 要素に Tab が入らない, role="menu" の子のみ focusable）。
+         * 開く演出: dropdown-enter-right（nav-menu-family / linear-app）
+         *   opacity 0→1 + translateX(10%→0), 0.2s ease。
+         * 項目は CSS animation-delay で stagger（各 +30ms）。
+         */}
+        <div className={styles.menuWrapper}>
+          <button
+            className={styles.btn}
+            aria-haspopup="menu"
+            aria-expanded={openMenu === "save"}
+            onClick={toggleSave}
+          >
+            保存▼
+          </button>
+          {openMenu === "save" && (
+            <div className={styles.menuPanel} role="menu">
+              <button
+                role="menuitem"
+                className={styles.menuItem}
+                style={{ animationDelay: "0ms" }}
+                onClick={runAndClose(onSaveYmscript)}
+              >
+                .ymscript として保存
+              </button>
+              <button
+                role="menuitem"
+                className={styles.menuItem}
+                style={{ animationDelay: "30ms" }}
+                onClick={runAndClose(onSaveMarkdown)}
+              >
+                .md として保存
+              </button>
+              <button
+                role="menuitem"
+                className={styles.menuItem}
+                style={{ animationDelay: "60ms" }}
+                onClick={runAndClose(onExportCSV)}
+              >
+                CSV を書き出す
+              </button>
+            </div>
+          )}
+        </div>
 
-        {/* 読込メニュー */}
-        <details className={styles.menu}>
-          <summary>読込▼</summary>
-          <div className={styles.menuItems}>
-            <button onClick={openYmscriptPicker}>.ymscript を読み込む</button>
-            <button onClick={openMarkdownPicker}>.md を読み込む</button>
-          </div>
-        </details>
+        {/* ===== 読込メニュー (item 5) ===== */}
+        <div className={styles.menuWrapper}>
+          <button
+            className={styles.btn}
+            aria-haspopup="menu"
+            aria-expanded={openMenu === "load"}
+            onClick={toggleLoad}
+          >
+            読込▼
+          </button>
+          {openMenu === "load" && (
+            <div className={styles.menuPanel} role="menu">
+              <button
+                role="menuitem"
+                className={styles.menuItem}
+                style={{ animationDelay: "0ms" }}
+                onClick={openYmscriptPicker}
+              >
+                .ymscript を読み込む
+              </button>
+              <button
+                role="menuitem"
+                className={styles.menuItem}
+                style={{ animationDelay: "30ms" }}
+                onClick={openMarkdownPicker}
+              >
+                .md を読み込む
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {/* aria-label でテストから取得可能にする（a11y 改善も兼ねる）。 */}

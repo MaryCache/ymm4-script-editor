@@ -1,4 +1,7 @@
 // src/components/Header/Header.test.tsx
+// item 5 対応: <details> → 制御状態メニューへの変更に伴い、
+// メニュー項目をクリックする前に対応するトグルボタン（"保存▼"/"読込▼"）を開くステップを追加。
+// 項目は DOM に出ていない時は不可視なため、先にメニューを開く必要がある。
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Header } from "./Header";
@@ -29,33 +32,61 @@ test("全件コピーで onCopyAll が呼ばれる", async () => {
   expect(onCopyAll).toHaveBeenCalled();
 });
 
-// m-4: 保存メニューの各ボタンが対応する handler を呼ぶ
+// m-4 / item 5: 保存メニューを開いてから各ボタンをクリックする
 test("保存メニュー: .ymscript として保存で onSaveYmscript が呼ばれる", async () => {
   const onSaveYmscript = vi.fn();
   render(<Header {...baseProps} onSaveYmscript={onSaveYmscript} />);
-  await userEvent.click(screen.getByRole("button", { name: ".ymscript として保存" }));
+  // 保存▼ を開く
+  await userEvent.click(screen.getByRole("button", { name: "保存▼" }));
+  await userEvent.click(screen.getByRole("menuitem", { name: ".ymscript として保存" }));
   expect(onSaveYmscript).toHaveBeenCalled();
 });
 
 test("保存メニュー: .md として保存で onSaveMarkdown が呼ばれる", async () => {
   const onSaveMarkdown = vi.fn();
   render(<Header {...baseProps} onSaveMarkdown={onSaveMarkdown} />);
-  await userEvent.click(screen.getByRole("button", { name: ".md として保存" }));
+  await userEvent.click(screen.getByRole("button", { name: "保存▼" }));
+  await userEvent.click(screen.getByRole("menuitem", { name: ".md として保存" }));
   expect(onSaveMarkdown).toHaveBeenCalled();
 });
 
 test("保存メニュー: CSV を書き出すで onExportCSV が呼ばれる", async () => {
   const onExportCSV = vi.fn();
   render(<Header {...baseProps} onExportCSV={onExportCSV} />);
-  await userEvent.click(screen.getByRole("button", { name: "CSV を書き出す" }));
+  await userEvent.click(screen.getByRole("button", { name: "保存▼" }));
+  await userEvent.click(screen.getByRole("menuitem", { name: "CSV を書き出す" }));
   expect(onExportCSV).toHaveBeenCalled();
 });
 
-// m-4: hidden file input への upload で onLoadYmscript / onLoadMarkdown が File 付きで呼ばれる
+// item 5: 排他制御のテスト — 片方を開くともう片方は閉じる
+test("保存▼ を開いた状態で 読込▼ を開くと保存メニューが閉じる", async () => {
+  render(<Header {...baseProps} />);
+  await userEvent.click(screen.getByRole("button", { name: "保存▼" }));
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  // 読込▼ を開く → 保存メニューは閉じるはず
+  await userEvent.click(screen.getByRole("button", { name: "読込▼" }));
+  // 画面に存在するメニューは1つ（読込メニュー）のみ
+  expect(screen.getAllByRole("menu")).toHaveLength(1);
+  expect(screen.getByRole("menuitem", { name: ".ymscript を読み込む" })).toBeInTheDocument();
+  expect(screen.queryByRole("menuitem", { name: ".ymscript として保存" })).not.toBeInTheDocument();
+});
+
+// item 5: Escape でメニューが閉じる
+test("Escape キーでメニューが閉じる", async () => {
+  render(<Header {...baseProps} />);
+  await userEvent.click(screen.getByRole("button", { name: "保存▼" }));
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByRole("menu")).not.toBeInTheDocument();
+});
+
+// m-4 / item 5: hidden file input への upload — 「読込▼」を開いてから
+// getByLabelText で hidden input を取得して upload する。
 test("ファイル読込: .ymscript ファイルを選択すると onLoadYmscript が File 付きで呼ばれる", async () => {
   const onLoadYmscript = vi.fn();
   render(<Header {...baseProps} onLoadYmscript={onLoadYmscript} />);
   // aria-label=".ymscript ファイル" で hidden input を取得する（m-4 / a11y 改善）
+  // hidden input は DOM に常に存在するため、メニューを開かなくても getByLabelText できる
   const input = screen.getByLabelText(".ymscript ファイル");
   const file = new File(['{"lines":[]}'], "test.ymscript", { type: "application/json" });
   await userEvent.upload(input, file);
