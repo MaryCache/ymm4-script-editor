@@ -1,0 +1,99 @@
+/* OpeningOverlay.module.css
+ *
+ * opening-sequence (cygames: opening-fade-in + opening-fade-out) +
+ * loading-family (loading-fade-in 0.6s / loading-exit 0.8s → ここでは 0.5s に短縮) の最小構成。
+ *
+ * Phase クラス:
+ *   .enter  — fade-in: opacity 0→1 + scale 0.96→1 + glow
+ *   .idle   — 静止 (opacity: 1)
+ *   .exit   — loading-exit: opacity 1→0
+ *
+ * z-index: 9999 で全 UI より手前。コンテンツ (.app z-index: 1) は下に存在し続ける。
+ * pointer-events: none — オーバーレイ消去後もインタラクションを貫通させる。
+ *   (短時間演出なので事実上問題ない)
+ * prefers-reduced-motion: このコンポーネント自体が reduced では render されない (JS 側でガード済)。
+ */
+
+/* ===== ベースオーバーレイ ===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #00101d;          /* --bg-0 と同値。token 変数はモジュール外参照不可 */
+}
+
+/* ===== コンテンツ中央 ===== */
+.content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  /* アニメーションは .content に適用 (overlay 全体の不透明度は JS でクラス切替) */
+  transform-origin: center;
+}
+
+/* ===== ブランドマーク SVG ===== */
+.brandMark {
+  /* glow は filter で後付け。enter/idle フェーズで適用 */
+  filter: drop-shadow(0 0 18px rgba(43, 180, 230, 0.55));
+}
+
+/* ===== テキスト ===== */
+.title {
+  font-family: "IBM Plex Sans JP", "Noto Sans JP", -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", system-ui, sans-serif;
+  font-size: 18px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  color: rgba(234, 242, 248, 0.92);
+  text-align: center;
+}
+
+.sub {
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10.5px;
+  letter-spacing: 0.18em;
+  color: rgba(43, 180, 230, 0.6);
+  text-transform: uppercase;
+  text-align: center;
+  margin-top: -8px;
+}
+
+/* ===== opening-fade-in (enter フェーズ) ===== */
+/* opacity 0→1 + scale 0.96→1 + glow 強調。0.5s, --ease-out 近似 */
+.enter .content {
+  animation: openingFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@keyframes openingFadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+    filter: drop-shadow(0 0 0 rgba(43, 180, 230, 0));
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+    filter: drop-shadow(0 0 22px rgba(43, 180, 230, 0.7));
+  }
+}
+
+/* ===== idle フェーズ: 静止 ===== */
+.idle .content {
+  opacity: 1;
+  transform: scale(1);
+}
+
+/* ===== loading-exit (exit フェーズ) ===== */
+/* opacity 1→0。0.5s, ease-in。overlay 全体をフェードアウト */
+.exit {
+  animation: loadingExit 0.5s ease-in both;
+}
+
+@keyframes loadingExit {
+  from { opacity: 1; }
+  to   { opacity: 0; }
+}
