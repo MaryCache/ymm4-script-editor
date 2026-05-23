@@ -1,0 +1,10 @@
+/* src/components/CharacterPanel/CharacterPanel.module.css */
+.panel { width: 220px; flex-shrink: 0; padding: 16px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 12px; }
+.title { font-size: 13px; color: var(--color-text-sub); }
+.form { display: flex; gap: 6px; }
+.form input { flex: 1; min-width: 0; }
+.list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+.item { display: flex; align-items: center; gap: 8px; }
+.chip { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+.name { flex: 1; }
+.item button { padding: 2px 8px; }
