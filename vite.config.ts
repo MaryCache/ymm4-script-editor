@@ -19,11 +19,14 @@ export default defineConfig({
         background_color: "#0f1117",
         theme_color: "#5b8dff",
         icons: [
+          // purpose は "any" のみ。icon.svg はマスク用セーフゾーンを持たないため
+          // "maskable" を名乗らない（名乗ると Android で円形マスクにグリフが欠ける）。
+          // 主ターゲットは Chrome/Edge デスクトップ（モバイルはスコープ外 NF-21）。
           {
             src: "icon.svg",
             sizes: "any",
             type: "image/svg+xml",
-            purpose: "any maskable",
+            purpose: "any",
           },
         ],
       },
