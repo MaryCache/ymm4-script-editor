@@ -1,0 +1,5 @@
+/* src/components/ScriptEditor/ScriptEditor.module.css */
+.editor { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 16px; overflow: auto; }
+.bar { color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
+.list { display: flex; flex-direction: column; gap: 6px; }
+.add { align-self: flex-start; }
