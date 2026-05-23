@@ -163,8 +163,16 @@ export function Header(props: HeaderProps) {
 
       {/* ===== Right: action buttons ===== */}
       <div className={styles.headerActions}>
-        {/* 全件コピー: primary variant で最重要 CTA として強調 */}
-        <button className={styles.btnPrimary} onClick={onCopyAll}>全件コピー</button>
+        {/* ===== 全件コピーボタン (item 6) =====
+         * アイコン（⧉）＋ラベルで意図を伝える。primary 寄りの存在感。
+         * ホバー: nav-hover-glow（hover-feedback-family / cygames-corporate）
+         *   color/opacity/background/box-shadow 複合, 0.25〜0.5s。
+         * アクセシブル名 "全件コピー" は維持（aria-label でもテキストでも同一）。
+         */}
+        <button className={styles.btnCopyAll} onClick={onCopyAll} aria-label="全件コピー">
+          <span className={styles.copyAllIcon} aria-hidden="true">⧉</span>
+          全件コピー
+        </button>
 
         <div className={styles.vSep} aria-hidden="true" />
 
@@ -175,6 +183,9 @@ export function Header(props: HeaderProps) {
          * 開く演出: dropdown-enter-right（nav-menu-family / linear-app）
          *   opacity 0→1 + translateX(10%→0), 0.2s ease。
          * 項目は CSS animation-delay で stagger（各 +30ms）。
+         * ▼ シェブロン: submenu-icon-rotate（hover-feedback-family / cygames-corporate）
+         *   開いている時に rotate(180deg) で反転。0.3s ease。
+         *   アクセシブル名 "保存▼" は維持（▼ を aria-hidden にしない）。
          */}
         <div className={styles.menuWrapper}>
           <button
@@ -183,7 +194,7 @@ export function Header(props: HeaderProps) {
             aria-expanded={openMenu === "save"}
             onClick={toggleSave}
           >
-            保存▼
+            保存<span className={`${styles.chev} ${openMenu === "save" ? styles.chevOpen : ""}`}>▼</span>
           </button>
           {openMenu === "save" && (
             // I-3: aria-label でアクセシブル名を付与（role="menu" 単独では名前がなく AT が識別できない）
@@ -224,7 +235,7 @@ export function Header(props: HeaderProps) {
             aria-expanded={openMenu === "load"}
             onClick={toggleLoad}
           >
-            読込▼
+            読込<span className={`${styles.chev} ${openMenu === "load" ? styles.chevOpen : ""}`}>▼</span>
           </button>
           {openMenu === "load" && (
             // I-3: aria-label でアクセシブル名を付与（role="menu" 単独では名前がなく AT が識別できない）
