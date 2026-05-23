@@ -10,35 +10,39 @@
  *   the network. If IBM Plex Sans JP / JetBrains Mono are not installed on the
  *   user's machine, the next font in the stack is used automatically.
  *   The visual result is "best available font", never a broken layout.
+ *
+ * Color scheme: cold-blue-black (item 1)
+ *   Deep ocean-black base (#00101d) + cyan accent (#107dc8 / #2bb4e6).
+ *   danger / warn / ok / character colors (--char) are unchanged.
  */
 
 :root {
-  /* surfaces */
-  --bg-0: #0e0f12;
-  --bg-1: #15161a;
-  --bg-2: #1c1d22;
-  --bg-3: #24262d;
-  --bg-4: #2e3038;
+  /* surfaces — cold-blue-black base */
+  --bg-0: #00101d;
+  --bg-1: #04182a;
+  --bg-2: #082133;
+  --bg-3: #0e2c42;
+  --bg-4: #163850;
 
   /* borders */
-  --border-1: #24262d;
-  --border-2: #34363f;
-  --border-strong: #44464f;
+  --border-1: #0e2c42;
+  --border-2: #1d3a52;
+  --border-strong: #2c4d68;
 
   /* text */
-  --text-0: #f4f5f8;
-  --text-1: #c7c9d1;
-  --text-2: #878994;
-  --text-3: #5b5d68;
-  --text-4: #3d3f47;
+  --text-0: #eaf2f8;
+  --text-1: #b8c7d4;
+  --text-2: #7e94a8;
+  --text-3: #4f6679;
+  --text-4: #33485a;
 
-  /* accent */
-  --accent: #7eb1ff;
-  --accent-2: #b48cff;
-  --accent-dim: #3d6cb8;
-  --accent-soft: rgba(126, 177, 255, 0.14);
+  /* accent — cyan system */
+  --accent: #107dc8;
+  --accent-2: #2bb4e6;
+  --accent-dim: #0a4f80;
+  --accent-soft: rgba(16, 125, 200, 0.14);
 
-  /* status */
+  /* status — unchanged */
   --danger: #ef6a6a;
   --warn: #efb35f;
   --ok: #6ec48a;
@@ -71,7 +75,7 @@
 html, body { height: 100%; }
 #root { height: 100%; }
 
-/* ===== body: deep base + soft color glows + grid + grain ===== */
+/* ===== body: deep base + ambient blobs + grid + grain ===== */
 body {
   margin: 0;
   color: var(--text-1);
@@ -82,12 +86,12 @@ body {
   text-rendering: optimizeLegibility;
   overflow: hidden;
   background-color: var(--bg-0);
-  /* layered background: radial glows → linear overlay → base fill */
+  /* layered background: radial glows (cyan/blue) → linear overlay → base fill */
   background-image:
-    radial-gradient(1100px 700px at 12% -10%, rgba(126, 177, 255, 0.10) 0%, transparent 60%),
-    radial-gradient(900px 700px at 105% 110%, rgba(180, 140, 255, 0.08) 0%, transparent 55%),
+    radial-gradient(1100px 700px at 12% -10%, rgba(16, 125, 200, 0.10) 0%, transparent 60%),
+    radial-gradient(900px 700px at 105% 110%, rgba(43, 180, 230, 0.08) 0%, transparent 55%),
     radial-gradient(700px 500px at 60% 50%, rgba(239, 93, 117, 0.03) 0%, transparent 60%),
-    linear-gradient(180deg, #11121620 0%, transparent 30%),
+    linear-gradient(180deg, #00101d20 0%, transparent 30%),
     linear-gradient(180deg, var(--bg-0), var(--bg-0));
   background-attachment: fixed;
   position: relative;
@@ -128,13 +132,13 @@ input, select, textarea { font-family: inherit; color: inherit; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb {
-  background: #2e3038;
+  background: #163850;
   border-radius: 6px;
   border: 2px solid transparent;
   background-clip: padding-box;
 }
 ::-webkit-scrollbar-thumb:hover {
-  background: #3a3c45;
+  background: #1d3a52;
   background-clip: padding-box;
   border: 2px solid transparent;
 }

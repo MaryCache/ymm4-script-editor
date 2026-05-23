@@ -5,6 +5,9 @@
  *
  * --char 変数: 行ルート要素に style で注入されるキャラ色 hex。
  * left accent bar (::before) / focused num / char-select の左バーに使う。
+ *
+ * Color update (item 1): rgba accent values updated to cyan system
+ *   rgba(126,177,255,…) → rgba(16,125,200,…)
  */
 
 /* ===== Row container ===== */
@@ -40,6 +43,11 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
+/* prefers-reduced-motion: stop entry animation */
+@media (prefers-reduced-motion: reduce) {
+  .row { animation: none; }
+}
+
 /* left accent bar: キャラ色を ::before で縦線として表示。ホバー/フォーカスで出現。 */
 .row::before {
   content: "";
@@ -62,18 +70,18 @@
 }
 .row:hover::before { opacity: 0.9; transform: scaleY(1); }
 
-/* focused: セリフ入力フォーカス中に行全体をハイライト */
-.row.focused {
+/* focused: セリフ入力フォーカス中に行全体をハイライト — cyan system (item 1) */
+.focused {
   background:
-    radial-gradient(600px 60px at 30% 50%, rgba(126, 177, 255, 0.05), transparent 70%),
+    radial-gradient(600px 60px at 30% 50%, rgba(16, 125, 200, 0.06), transparent 70%),
     linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012));
-  border-color: rgba(126, 177, 255, 0.22);
+  border-color: rgba(16, 125, 200, 0.22);
   box-shadow:
-    0 0 0 1px rgba(126, 177, 255, 0.06),
-    0 12px 28px -14px rgba(126, 177, 255, 0.25),
+    0 0 0 1px rgba(16, 125, 200, 0.07),
+    0 12px 28px -14px rgba(16, 125, 200, 0.25),
     var(--shadow-row);
 }
-.row.focused::before { opacity: 1; transform: scaleY(1); }
+.focused::before { opacity: 1; transform: scaleY(1); }
 
 /* ===== Line number ===== */
 .num {
@@ -87,7 +95,7 @@
 }
 .row:hover .num { color: var(--text-2); }
 /* focused 時: キャラ色で行番号を染める（--char が注入されている前提） */
-.row.focused .num { color: var(--char); }
+.focused .num { color: var(--char); }
 
 /* ===== Character select wrapper ===== */
 /* Why wrapper: native <select> はブラウザ標準 a11y を保つ。左バーの色表現は wrapper に委ねる。 */
@@ -96,7 +104,7 @@
   height: 34px;
   border-radius: var(--radius-sm);
   overflow: hidden;
-  background: linear-gradient(180deg, rgba(36, 38, 45, 0.6), rgba(28, 29, 34, 0.6));
+  background: linear-gradient(180deg, rgba(8, 33, 51, 0.7), rgba(4, 24, 42, 0.7));
   border: 1px solid var(--border-1);
   display: flex; align-items: stretch;
   transition: all 160ms var(--ease-out);
@@ -104,7 +112,7 @@
 }
 .row:hover .charSelectWrapper {
   border-color: var(--border-2);
-  background: linear-gradient(180deg, rgba(42, 44, 52, 0.7), rgba(32, 34, 40, 0.7));
+  background: linear-gradient(180deg, rgba(14, 44, 66, 0.8), rgba(8, 33, 51, 0.8));
 }
 
 /* キャラ色の左バー — ::before で wrapper の左端に描画 */
@@ -162,10 +170,11 @@
   background: rgba(0, 0, 0, 0.25);
   border-color: rgba(255, 255, 255, 0.05);
 }
+/* dialogue focus — cyan system (item 1) */
 .dialogue:focus {
-  background: rgba(126, 177, 255, 0.04);
-  border-color: rgba(126, 177, 255, 0.4);
-  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08);
+  background: rgba(16, 125, 200, 0.05);
+  border-color: rgba(16, 125, 200, 0.4);
+  box-shadow: 0 0 0 3px rgba(16, 125, 200, 0.08);
 }
 .dialogue:focus-visible {
   outline: none; /* box-shadow でフォーカスを代替。強制カラーモードでは別途対応済み（global.css）。 */
@@ -198,16 +207,16 @@
 }
 
 /* warn: 25文字以上 (LINE_WARN_CHARS) */
-.countBadge.warn { color: var(--warn); }
-.row:hover .countBadge.warn {
+.warn { color: var(--warn); }
+.row:hover .warn {
   color: #f7c785;
   background: rgba(239, 179, 95, 0.10);
   border-color: rgba(239, 179, 95, 0.25);
 }
 
 /* long: 40文字以上 (LINE_LONG_CHARS) */
-.countBadge.long { color: var(--danger); }
-.row:hover .countBadge.long {
+.long { color: var(--danger); }
+.row:hover .long {
   color: #f48a8a;
   background: rgba(239, 106, 106, 0.10);
   border-color: rgba(239, 106, 106, 0.25);
@@ -216,7 +225,7 @@
 /* ===== Action buttons ===== */
 .actions {
   display: flex; align-items: center; gap: 1px;
-  background: linear-gradient(180deg, rgba(36, 38, 45, 0.85), rgba(28, 29, 34, 0.85));
+  background: linear-gradient(180deg, rgba(14, 44, 66, 0.9), rgba(8, 33, 51, 0.9));
   border: 1px solid var(--border-2);
   border-radius: var(--radius-sm);
   padding: 2px;

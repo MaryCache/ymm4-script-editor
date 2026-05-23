@@ -2,10 +2,14 @@
  * Why glass sidebar: body の多層背景を透かしつつ視覚的な左カラムを作る。
  * ::after で右エッジにアクセントグロー線を描画（装飾）。
  * overflow: hidden + flex: column で内部の char-list のみスクロールさせる。
+ *
+ * Color update (item 1): accent glow lines updated to cyan system
+ *   rgba(126,177,255,…) → rgba(16,125,200,…)
+ *   rgba(180,140,255,…) → rgba(43,180,230,…)
  */
 .sidebar {
   grid-area: side;
-  background: linear-gradient(180deg, rgba(22, 23, 28, 0.65) 0%, rgba(16, 17, 21, 0.55) 100%);
+  background: linear-gradient(180deg, rgba(4, 24, 42, 0.65) 0%, rgba(0, 16, 29, 0.55) 100%);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border-right: 1px solid rgba(255, 255, 255, 0.04);
@@ -15,12 +19,12 @@
   position: relative;
 }
 
-/* subtle inner highlight on right edge — decorative */
+/* subtle inner highlight on right edge — cyan system (item 1) */
 .sidebar::after {
   content: "";
   position: absolute;
   right: 0; top: 0; bottom: 0; width: 1px;
-  background: linear-gradient(180deg, transparent, rgba(126, 177, 255, 0.18) 30%, rgba(180, 140, 255, 0.18) 70%, transparent);
+  background: linear-gradient(180deg, transparent, rgba(16, 125, 200, 0.20) 30%, rgba(43, 180, 230, 0.15) 70%, transparent);
   opacity: 0.5;
   pointer-events: none;
 }
@@ -72,20 +76,20 @@
 }
 .input::placeholder { color: var(--text-3); }
 .input:focus {
-  border-color: rgba(126, 177, 255, 0.5);
-  background: rgba(126, 177, 255, 0.05);
-  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  border-color: rgba(16, 125, 200, 0.5);
+  background: rgba(16, 125, 200, 0.05);
+  box-shadow: 0 0 0 3px rgba(16, 125, 200, 0.08), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
 }
 .input:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
 }
 
-/* 追加アイコンボタン */
+/* 追加アイコンボタン — cyan system (item 1) */
 .addBtn {
   width: 30px; height: 30px;
-  background: linear-gradient(180deg, rgba(126, 177, 255, 0.10), rgba(126, 177, 255, 0.04));
-  border: 1px solid rgba(126, 177, 255, 0.4);
+  background: linear-gradient(180deg, rgba(16, 125, 200, 0.14), rgba(16, 125, 200, 0.06));
+  border: 1px solid rgba(16, 125, 200, 0.4);
   border-radius: var(--radius-sm);
   color: var(--accent);
   display: grid; place-items: center;
@@ -97,8 +101,8 @@
   line-height: 1;
 }
 .addBtn:hover {
-  background: linear-gradient(180deg, rgba(126, 177, 255, 0.18), rgba(126, 177, 255, 0.08));
-  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+  background: linear-gradient(180deg, rgba(16, 125, 200, 0.22), rgba(16, 125, 200, 0.10));
+  box-shadow: 0 0 0 3px rgba(16, 125, 200, 0.10), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
 }
 .addBtn:focus-visible {
   outline: 2px solid var(--accent);
@@ -123,8 +127,56 @@
   transition: background 160ms var(--ease-out);
   position: relative;
   cursor: default;
+  /* overflow: hidden で height collapse のアニメーションを綺麗に見せる */
+  overflow: hidden;
 }
 .charItem:hover { background: rgba(255, 255, 255, 0.03); }
+
+/* ===== Item 4: 追加アニメーション (appear-slide — scroll-reveal-family / fukujo-kansei)
+ * opacity 0→1 + translateX(-6px→0), 0.18s, cubic-bezier(.4,0,.2,1)
+ * backwards: レンダリング前からキーフレーム開始値を適用し flash-of-content を防ぐ。
+ */
+.charItemEnter {
+  animation: charAppearSlide 0.18s cubic-bezier(0.4, 0, 0.2, 1) both;
+}
+
+@keyframes charAppearSlide {
+  from { opacity: 0; transform: translateX(-6px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* ===== Item 4: 削除アニメーション (退場: opacity→0 + translateX(8px) + height collapse)
+ * 0.18s cubic-bezier(.4,0,.2,1)。
+ * height collapse を max-height で近似する（height: auto の transition 制限を回避）。
+ * CSS アニメーションが完了後、JS タイムアウトで onDelete を呼ぶ（CharacterPanel.tsx 参照）。
+ */
+.charItemRemoving {
+  animation: charExitSlide 0.18s cubic-bezier(0.4, 0, 0.2, 1) both;
+  pointer-events: none; /* アニメーション中の誤クリック防止 */
+}
+
+@keyframes charExitSlide {
+  from {
+    opacity: 1;
+    transform: translateX(0);
+    max-height: 60px;
+    padding-top: 8px;
+    padding-bottom: 8px;
+  }
+  to {
+    opacity: 0;
+    transform: translateX(8px);
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+}
+
+/* prefers-reduced-motion: item 4 のアニメーションを無効化（即時表示・即時削除） */
+@media (prefers-reduced-motion: reduce) {
+  .charItemEnter   { animation: none; }
+  .charItemRemoving { animation: none; }
+}
 
 /* カラードット: --c でキャラ色、--c-glow でグロー色を受け取る */
 .dot {

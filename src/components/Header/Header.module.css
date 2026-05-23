@@ -1,10 +1,14 @@
 /* Header.module.css
  * Why glass: ガラス質感（backdrop-filter + 半透明グラデ）で body の多層背景を透かしながら
  * 視覚的な分離を保つ。box-shadow の inset highlight でエッジに立体感を与える。
+ *
+ * Color update (item 1): rgba glow values updated from purple-blue to cyan system
+ *   rgba(126,177,255,…) → rgba(16,125,200,…)
+ *   rgba(180,140,255,…) → rgba(43,180,230,…)
  */
 .header {
   grid-area: header;
-  background: linear-gradient(180deg, rgba(28, 29, 34, 0.78) 0%, rgba(20, 21, 25, 0.72) 100%);
+  background: linear-gradient(180deg, rgba(4, 24, 42, 0.78) 0%, rgba(0, 16, 29, 0.72) 100%);
   backdrop-filter: blur(14px) saturate(140%);
   -webkit-backdrop-filter: blur(14px) saturate(140%);
   border-bottom: 1px solid rgba(255, 255, 255, 0.045);
@@ -20,12 +24,12 @@
   gap: 8px;
 }
 
-/* hairline glow under header — decorative, aria-hidden by being a ::after pseudo */
+/* hairline glow under header — cyan gradient (item 1: was purple-blue) */
 .header::after {
   content: "";
   position: absolute;
   left: 8%; right: 8%; bottom: -1px; height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(126, 177, 255, 0.35), rgba(180, 140, 255, 0.35), transparent);
+  background: linear-gradient(90deg, transparent, rgba(16, 125, 200, 0.45), rgba(43, 180, 230, 0.35), transparent);
   opacity: 0.6;
   pointer-events: none;
 }
@@ -38,19 +42,21 @@
   flex-shrink: 0;
 }
 
+/* Brand mark: gradient updated to cyan system (item 1) */
 .brandMark {
   width: 26px; height: 26px;
   border-radius: 7px;
-  background: linear-gradient(135deg, #7eb1ff 0%, #b48cff 55%, #ef5d75 110%);
+  /* cyan gradient: #107dc8 → #2bb4e6 → accent of #ef5d75 for warmth contrast */
+  background: linear-gradient(135deg, #107dc8 0%, #2bb4e6 55%, #58d3f0 110%);
   background-size: 200% 200%;
   animation: brandShift 11s ease-in-out infinite;
   display: grid; place-items: center;
-  font-weight: 700; font-size: 11px; color: #0a0c12;
+  font-weight: 700; font-size: 11px; color: #001420;
   letter-spacing: -0.02em;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.25) inset,
     0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 6px 18px -6px rgba(126, 177, 255, 0.5);
+    0 6px 18px -6px rgba(16, 125, 200, 0.55);
   flex-shrink: 0;
 }
 
@@ -81,9 +87,9 @@
 }
 .projectName:hover { background: rgba(255, 255, 255, 0.03); }
 .projectName:focus {
-  background: rgba(126, 177, 255, 0.06);
-  border-color: rgba(126, 177, 255, 0.45);
-  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08);
+  background: rgba(16, 125, 200, 0.06);
+  border-color: rgba(16, 125, 200, 0.45);
+  box-shadow: 0 0 0 3px rgba(16, 125, 200, 0.08);
 }
 /* キーボードフォーカス時は focus-visible が outline を付与するが、
    border の変化でマウス操作でも視覚フィードバックを出す（:focus のまま）。 */
@@ -113,7 +119,7 @@
   height: 30px;
   padding: 0 12px;
   border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, #25272e 0%, #1e1f25 100%);
+  background: linear-gradient(180deg, #0e2c42 0%, #082133 100%);
   border: 1px solid var(--border-2);
   color: var(--text-1);
   font-size: 12px;
@@ -129,7 +135,7 @@
   cursor: pointer;
 }
 .btn:hover {
-  background: linear-gradient(180deg, #2c2e36 0%, #24252c 100%);
+  background: linear-gradient(180deg, #163850 0%, #0e2c42 100%);
   border-color: var(--border-strong);
   color: var(--text-0);
   transform: translateY(-1px);
@@ -140,24 +146,24 @@
 .btn:active { transform: translateY(0); }
 .btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
-/* primary variant: bright blue for the main CTA */
+/* primary variant: bright cyan for the main CTA (item 1) */
 .btnPrimary {
   composes: btn;
-  background: linear-gradient(180deg, #8cbaff 0%, #6a9aef 100%);
-  border-color: #6a9aef;
-  color: #0a0e16;
+  background: linear-gradient(180deg, #2bb4e6 0%, #107dc8 100%);
+  border-color: #107dc8;
+  color: #001420;
   font-weight: 600;
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.35) inset,
     0 -1px 0 rgba(0, 0, 0, 0.15) inset,
-    0 6px 18px -6px rgba(126, 177, 255, 0.55);
+    0 6px 18px -6px rgba(16, 125, 200, 0.55);
 }
 .btnPrimary:hover {
-  background: linear-gradient(180deg, #9dc6ff 0%, #7eaaf5 100%);
+  background: linear-gradient(180deg, #58d3f0 0%, #2bb4e6 100%);
   box-shadow:
     0 1px 0 rgba(255, 255, 255, 0.4) inset,
-    0 8px 22px -6px rgba(126, 177, 255, 0.7);
-  color: #0a0e16;
+    0 8px 22px -6px rgba(43, 180, 230, 0.7);
+  color: #001420;
 }
 /* shimmer sweep on primary hover — purely decorative motion */
 .btnPrimary::before {
@@ -172,44 +178,20 @@
 }
 .btnPrimary:hover::before { left: 130%; }
 
-/* ===== Dropdown menus (<details> disclosure pattern) ===== */
-.menu {
+/* ===== Dropdown menus (item 5: controlled state + dropdown-enter-right animation) =====
+ * <details> を廃止し、制御状態 openMenu: "save" | "load" | null で排他制御。
+ * パネルは開いている時のみ DOM に存在する（hidden 要素に Tab が入らない a11y 仕様）。
+ */
+.menuWrapper {
   position: relative;
 }
 
-/* <summary> as the trigger button — styled to match .btn */
-.menu summary {
-  list-style: none;
-  cursor: pointer;
-  height: 30px;
-  padding: 0 12px;
-  border-radius: var(--radius-sm);
-  background: linear-gradient(180deg, #25272e 0%, #1e1f25 100%);
-  border: 1px solid var(--border-2);
-  color: var(--text-1);
-  font-size: 12px;
-  font-weight: 500;
-  display: inline-flex; align-items: center;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.04) inset,
-    0 1px 2px rgba(0, 0, 0, 0.3);
-  transition: all 140ms var(--ease-out);
-  white-space: nowrap;
-  font-family: inherit;
-}
-.menu summary::-webkit-details-marker { display: none; }
-.menu summary:hover {
-  background: linear-gradient(180deg, #2c2e36 0%, #24252c 100%);
-  border-color: var(--border-strong);
-  color: var(--text-0);
-}
-.menu summary:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 1px;
-}
-
-/* popup panel */
-.menuItems {
+/* popup panel:
+ * dropdown-enter-right (nav-menu-family / linear-app):
+ *   opacity 0→1 + translateX(10%→0), 0.2s ease
+ * animation: backwards prevents flash-of-content before keyframe start.
+ */
+.menuPanel {
   position: absolute;
   right: 0;
   top: calc(100% + 6px);
@@ -224,10 +206,12 @@
   white-space: nowrap;
   box-shadow: var(--shadow-pop);
   min-width: 160px;
+  animation: dropdownEnterRight 0.2s ease both;
+  transform-origin: top right;
 }
 
-/* menu item buttons inside popup */
-.menuItems button {
+/* menu item buttons — each animates separately with stagger via inline style animationDelay */
+.menuItem {
   width: 100%;
   height: 30px;
   padding: 0 10px;
@@ -242,13 +226,33 @@
   cursor: pointer;
   transition: all 120ms var(--ease-out);
   font-family: inherit;
+  /* stagger entry — delayed via inline style (animationDelay) */
+  animation: menuItemEnter 0.2s ease both;
 }
-.menuItems button:hover {
-  background: rgba(255, 255, 255, 0.06);
+.menuItem:hover {
+  background: rgba(16, 125, 200, 0.10);
   color: var(--text-0);
-  border-color: rgba(255, 255, 255, 0.06);
+  border-color: rgba(16, 125, 200, 0.15);
 }
-.menuItems button:focus-visible {
+.menuItem:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 1px;
+}
+
+/* dropdown-enter-right: opacity 0→1 + translateX(10%→0), 0.2s (nav-menu-family / linear-app) */
+@keyframes dropdownEnterRight {
+  from { opacity: 0; transform: translateX(10%); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+/* menu item stagger entry: subtle fade-up (appears with panel) */
+@keyframes menuItemEnter {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* prefers-reduced-motion: disable dropdown and item animations */
+@media (prefers-reduced-motion: reduce) {
+  .menuPanel { animation: none; }
+  .menuItem  { animation: none; }
 }

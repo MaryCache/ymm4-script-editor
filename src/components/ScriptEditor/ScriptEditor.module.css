@@ -1,6 +1,9 @@
 /* ScriptEditor.module.css
  * Why flex-column: main エリア全体を縦に占め、editor-head を固定高、
  * lines-scroll を残高で stretch させ、add-row を下部に配置する。
+ *
+ * Color update (item 1): rgba accent values updated to cyan system
+ *   rgba(126,177,255,…) → rgba(16,125,200,…)
  */
 .main {
   grid-area: main;
@@ -18,7 +21,7 @@
   border-bottom: 1px solid rgba(255, 255, 255, 0.04);
   display: flex; align-items: center; justify-content: space-between;
   padding: 0 22px;
-  background: linear-gradient(180deg, rgba(20, 21, 25, 0.4), transparent);
+  background: linear-gradient(180deg, rgba(4, 24, 42, 0.4), transparent);
   backdrop-filter: blur(6px);
   -webkit-backdrop-filter: blur(6px);
 }
@@ -49,7 +52,7 @@
   font-size: 11px;
 }
 
-/* イコライザ風波形 — 純粋装飾アニメーション */
+/* イコライザ風波形 — 純粋装飾アニメーション — cyan system (item 1) */
 .waveform {
   display: inline-flex; align-items: flex-end; gap: 2px;
   height: 16px;
@@ -61,6 +64,7 @@
   opacity: 0.75;
   animation: bar 1.4s ease-in-out infinite;
 }
+/* accent and accent-2 remain --accent (#107dc8) and --accent-2 (#2bb4e6) after item 1 */
 .waveform span:nth-child(1) { height: 30%; animation-delay: 0.0s; background: var(--accent); }
 .waveform span:nth-child(2) { height: 80%; animation-delay: 0.1s; background: var(--accent); }
 .waveform span:nth-child(3) { height: 55%; animation-delay: 0.2s; background: var(--accent-2); }
@@ -72,9 +76,25 @@
   50%       { transform: scaleY(1); }
 }
 
+/* prefers-reduced-motion: stop waveform animation */
+@media (prefers-reduced-motion: reduce) {
+  .waveform span { animation: none; }
+}
+
+/* ===== Lines scroll wrapper (item 7: scroll indicator container)
+ * position: relative で scroll indicator を絶対配置のアンカーにする。
+ * flex: 1 で editor-head 以外の全高を占有。overflow: hidden でスクロールを子の
+ * .linesScroll に委譲する。
+ */
+.linesScrollWrapper {
+  flex: 1;
+  overflow: hidden;
+  position: relative;
+}
+
 /* ===== Lines scroll area ===== */
 .linesScroll {
-  flex: 1;
+  height: 100%;
   overflow-y: auto;
   padding: 16px 22px 80px;
 }
@@ -86,7 +106,11 @@
   gap: 2px;
 }
 
-/* ===== Add row button ===== */
+/* ===== Add row button (item 2: 二重 + 修正) =====
+ * aria-label="+ 行を追加"（テストのアクセシブル名を維持）
+ * 可視テキストは「行を追加」。装飾 .plus（aria-hidden）が「+」を見せる。
+ * 結果: 見た目「＋ 行を追加」(+は1つ)、アクセシブル名 "+ 行を追加"。
+ */
 .addRow {
   margin-top: 14px;
   height: 40px;
@@ -105,11 +129,11 @@
   font-family: inherit;
 }
 .addRow:hover {
-  background: rgba(126, 177, 255, 0.05);
+  background: rgba(16, 125, 200, 0.06);
   color: var(--text-0);
-  border-color: rgba(126, 177, 255, 0.4);
+  border-color: rgba(16, 125, 200, 0.4);
   border-style: solid;
-  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.06);
+  box-shadow: 0 0 0 3px rgba(16, 125, 200, 0.07);
 }
 .addRow:disabled {
   opacity: 0.35;
@@ -120,7 +144,7 @@
   outline-offset: 2px;
 }
 
-/* + 記号: ホバーで90度回転（装飾モーション） */
+/* + 記号 (装飾): ホバーで90度回転（装飾モーション）。aria-hidden で読まれない。 */
 .plus {
   font-family: var(--font-mono);
   font-size: 15px;
@@ -130,3 +154,50 @@
   display: inline-block;
 }
 .addRow:hover .plus { transform: rotate(90deg); }
+
+/* ===== スクロールインジケーター (item 7: scroll-arrow-pulse — scroll-indicator.md / cygames-corporate)
+ * canScrollDown が true のとき表示。
+ * linesScrollWrapper の bottom center に固定配置（position: absolute）。
+ * 上下に脈動する矢印が「まだ下がある」を伝える（scroll-arrow-pulse: infinite loop）。
+ * aria-hidden: 純粋装飾。
+ * prefers-reduced-motion: reduce では脈動を止める（表示自体は残す）。
+ */
+.scrollIndicator {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  /* 表示時に fade-in */
+  animation: scrollIndicatorFadeIn 0.3s ease both;
+}
+
+.scrollArrow {
+  font-size: 12px;
+  color: var(--accent-2);
+  opacity: 0.7;
+  /* scroll-arrow-pulse: 上下に脈動（scroll-indicator.md / cygames-corporate） */
+  animation: scrollArrowPulse 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(43, 180, 230, 0.5));
+}
+
+@keyframes scrollIndicatorFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* scroll-arrow-pulse: 上下に脈動する矢印 */
+@keyframes scrollArrowPulse {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50%       { transform: translateY(5px); opacity: 0.9; }
+}
+
+/* prefers-reduced-motion: 脈動を止める（表示自体は残す。item 7 要件） */
+@media (prefers-reduced-motion: reduce) {
+  .scrollArrow { animation: none; }
+  .scrollIndicator { animation: none; }
+}
