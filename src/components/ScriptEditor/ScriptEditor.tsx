@@ -35,9 +35,11 @@ export type ScriptEditorProps = {
 
 const FLIP_DURATION = 220; // ms — CSS transition と合わせる
 
-// Why no lines parameter: useLayoutEffect runs after every render (no dep array),
-// which naturally captures DOM changes from lines prop updates in the parent.
-function useFLIP() {
+// signature: 行の順序＋件数を表す文字列。これが変わった時だけ FLIP を実行する。
+// Why: セリフ入力欄は単一行で行高が固定 → テキスト打鍵では行は移動しない。
+// 毎レンダーで全行の getBoundingClientRect を呼ぶと 500 行で layout thrashing になり
+// NF-10（入力遅延ゼロ）に反する。構造変化（並べ替え/追加/削除）時のみ測定・アニメする。
+function useFLIP(signature: string) {
   // rowRefs: lineId → HTMLElement の Map。LineRow の DOM ノードを収集する。
   const rowRefs = useRef<Map<string, HTMLElement>>(new Map());
   // addRowRef: 「行を追加」ボタンの DOM ノード
@@ -123,7 +125,7 @@ function useFLIP() {
 
     // === 次回 First 用に現在の rect を保存 ===
     prevRects.current = currentRects;
-  }); // 依存配列なし: lines 変化を含む毎レンダー後に実行
+  }, [signature]); // 構造変化（並べ替え/追加/削除）時のみ実行 — テキスト編集では走らない
 
   return { getRowRef, addRowRef };
 }
@@ -166,7 +168,9 @@ export function ScriptEditor(props: ScriptEditorProps) {
   const canAdd = props.characters.length > 0;
 
   // ===== FLIP (item 3) =====
-  const { getRowRef, addRowRef } = useFLIP();
+  // 行の順序＋件数のシグネチャ。これが変わった時だけ FLIP が走る（テキスト編集では不変）。
+  const orderSignature = props.lines.map((l) => l.id).join("|");
+  const { getRowRef, addRowRef } = useFLIP(orderSignature);
 
   // ===== スクロールインジケーター (item 7) =====
   const linesScrollRef = useRef<HTMLDivElement>(null);
