@@ -1,18 +1,188 @@
-/* src/components/CharacterPanel/CharacterPanel.module.css */
-/* min-height: 0 は flex 子として高さが縮めるために必要（overflow: hidden と組み合わせて
-   内部の .list スクロールが機能する）。overflow: hidden でパネル自体のはみ出しを防ぐ。 */
-.panel { width: 220px; flex-shrink: 0; padding: 16px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
-.title { font-size: 13px; color: var(--color-text-sub); }
-.form { display: flex; gap: 6px; }
-.form input { flex: 1; min-width: 0; }
+/* CharacterPanel.module.css
+ * Why glass sidebar: body の多層背景を透かしつつ視覚的な左カラムを作る。
+ * ::after で右エッジにアクセントグロー線を描画（装飾）。
+ * overflow: hidden + flex: column で内部の char-list のみスクロールさせる。
+ */
+.sidebar {
+  grid-area: side;
+  background: linear-gradient(180deg, rgba(22, 23, 28, 0.65) 0%, rgba(16, 17, 21, 0.55) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border-right: 1px solid rgba(255, 255, 255, 0.04);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+}
+
+/* subtle inner highlight on right edge — decorative */
+.sidebar::after {
+  content: "";
+  position: absolute;
+  right: 0; top: 0; bottom: 0; width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(126, 177, 255, 0.18) 30%, rgba(180, 140, 255, 0.18) 70%, transparent);
+  opacity: 0.5;
+  pointer-events: none;
+}
+
+/* ===== Panel head ===== */
+.panelHead {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 14px 10px;
+  color: var(--text-2);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+/* キャラクター数バッジ */
+.count {
+  background: var(--bg-2);
+  color: var(--text-2);
+  border: 1px solid var(--border-1);
+  border-radius: 999px;
+  padding: 1px 8px;
+  font-size: 10px;
+  letter-spacing: 0;
+  font-weight: 500;
+  font-family: var(--font-mono);
+}
+
+/* ===== Add character row ===== */
+.charAdd {
+  display: flex;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.input {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  padding: 0 10px;
+  font-size: 12px;
+  outline: none;
+  transition: all 140ms var(--ease-out);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.02) inset;
+}
+.input::placeholder { color: var(--text-3); }
+.input:focus {
+  border-color: rgba(126, 177, 255, 0.5);
+  background: rgba(126, 177, 255, 0.05);
+  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+}
+.input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* 追加アイコンボタン */
+.addBtn {
+  width: 30px; height: 30px;
+  background: linear-gradient(180deg, rgba(126, 177, 255, 0.10), rgba(126, 177, 255, 0.04));
+  border: 1px solid rgba(126, 177, 255, 0.4);
+  border-radius: var(--radius-sm);
+  color: var(--accent);
+  display: grid; place-items: center;
+  transition: all 140ms var(--ease-out);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset;
+  cursor: pointer;
+  flex-shrink: 0;
+  font-size: 16px;
+  line-height: 1;
+}
+.addBtn:hover {
+  background: linear-gradient(180deg, rgba(126, 177, 255, 0.18), rgba(126, 177, 255, 0.08));
+  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08), 0 1px 0 rgba(255, 255, 255, 0.05) inset;
+}
+.addBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ===== Character list ===== */
 /* キャラ一覧が長くなってもパネルがはみ出さないようスクロール可能にする。
-   min-height: 0 は flex 子要素がコンテンツの高さより縮めるために必要（flex-shrink が効く前提）。
    flex: 1 でパネルの残り高さを埋め、overflow-y: auto でスクロールバーを出す。 */
-.list { list-style: none; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow-y: auto; }
-.item { display: flex; align-items: center; gap: 8px; }
-.chip { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-.name { flex: 1; }
-/* タグ依存セレクタをやめ、専用クラスで削除ボタンをスタイリングする。
-   --color-danger で破壊操作の視覚的アフォーダンスを提供する。 */
-.deleteButton { padding: 2px 8px; }
-.deleteButton:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
+.charList {
+  padding: 4px 8px 12px;
+  overflow-y: auto;
+  flex: 1;
+  min-height: 0;
+}
+
+/* キャラクター行 */
+.charItem {
+  display: flex; align-items: center; gap: 10px;
+  padding: 8px 8px;
+  border-radius: var(--radius);
+  transition: background 160ms var(--ease-out);
+  position: relative;
+  cursor: default;
+}
+.charItem:hover { background: rgba(255, 255, 255, 0.03); }
+
+/* カラードット: --c でキャラ色、--c-glow でグロー色を受け取る */
+.dot {
+  width: 11px; height: 11px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  /* background は style 属性でキャラ色を直接注入 */
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.04),
+    0 0 12px var(--c-glow, transparent);
+}
+
+.name {
+  flex: 1;
+  color: var(--text-0);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+/* セリフ行数バッジ */
+.linesCount {
+  color: var(--text-3);
+  font-size: 10.5px;
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+  margin-right: 2px;
+  background: rgba(255, 255, 255, 0.025);
+  padding: 1px 6px;
+  border-radius: 3px;
+}
+
+/* 削除ボタン: ホバーで出現 */
+.del {
+  width: 22px; height: 22px;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--text-3);
+  display: grid; place-items: center;
+  opacity: 0;
+  transition: opacity 140ms var(--ease-out), background 140ms, color 140ms;
+  cursor: pointer;
+  font-size: 12px;
+  flex-shrink: 0;
+}
+.charItem:hover .del { opacity: 1; }
+.del:hover { background: rgba(239, 106, 106, 0.15); color: var(--danger); }
+.del:disabled { opacity: 0.2; cursor: not-allowed; }
+.del:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* ===== Sidebar footer (decorative version badge) ===== */
+.sidebarFooter {
+  margin-top: auto;
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.04);
+  color: var(--text-3);
+  font-size: 10.5px;
+  display: flex; justify-content: space-between; align-items: center;
+  background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.25));
+}
+.ver { font-family: var(--font-mono); }

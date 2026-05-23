@@ -60,6 +60,8 @@ export default function App() {
     exportCSVToClipboard().catch(() => alert("クリップボードへのコピーに失敗しました。"));
   }, [exportCSVToClipboard]);
 
+  // App shell は CSS Grid (.app)。Header / CharacterPanel / ScriptEditor が
+  // それぞれ grid-area を自己申告するため、中間の wrapper div は不要になった。
   return (
     <div className={styles.app}>
       <Header
@@ -72,25 +74,23 @@ export default function App() {
         onLoadMarkdown={importMarkdown}
         onCopyAll={onCopyAll}
       />
-      <div className={styles.body}>
-        <CharacterPanel
-          characters={project.characters}
-          onAdd={addCharacter}
-          onDelete={deleteCharacter}
-        />
-        <ScriptEditor
-          characters={project.characters}
-          lines={project.lines}
-          onAddLine={addLineAtEnd}
-          onCharacterChange={updateLineCharacter}
-          onTextChange={updateLineText}
-          onMoveUp={onMoveUp}
-          onMoveDown={onMoveDown}
-          onAddAfter={addLineAfter}
-          onDelete={deleteLine}
-          onCopy={copyLine}
-        />
-      </div>
+      <CharacterPanel
+        characters={project.characters}
+        onAdd={addCharacter}
+        onDelete={deleteCharacter}
+      />
+      <ScriptEditor
+        characters={project.characters}
+        lines={project.lines}
+        onAddLine={addLineAtEnd}
+        onCharacterChange={updateLineCharacter}
+        onTextChange={updateLineText}
+        onMoveUp={onMoveUp}
+        onMoveDown={onMoveDown}
+        onAddAfter={addLineAfter}
+        onDelete={deleteLine}
+        onCopy={copyLine}
+      />
     </div>
   );
 }

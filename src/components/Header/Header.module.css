@@ -1,10 +1,254 @@
-/* src/components/Header/Header.module.css */
-.header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
-.projectName { font-size: 16px; font-weight: 600; min-width: 12em; }
+/* Header.module.css
+ * Why glass: ガラス質感（backdrop-filter + 半透明グラデ）で body の多層背景を透かしながら
+ * 視覚的な分離を保つ。box-shadow の inset highlight でエッジに立体感を与える。
+ */
+.header {
+  grid-area: header;
+  background: linear-gradient(180deg, rgba(28, 29, 34, 0.78) 0%, rgba(20, 21, 25, 0.72) 100%);
+  backdrop-filter: blur(14px) saturate(140%);
+  -webkit-backdrop-filter: blur(14px) saturate(140%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.045);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.025) inset,
+    0 8px 24px -16px rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  user-select: none;
+  position: relative;
+  gap: 8px;
+}
+
+/* hairline glow under header — decorative, aria-hidden by being a ::after pseudo */
+.header::after {
+  content: "";
+  position: absolute;
+  left: 8%; right: 8%; bottom: -1px; height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(126, 177, 255, 0.35), rgba(180, 140, 255, 0.35), transparent);
+  opacity: 0.6;
+  pointer-events: none;
+}
+
+/* ===== Brand ===== */
+.brand {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-shrink: 0;
+}
+
+.brandMark {
+  width: 26px; height: 26px;
+  border-radius: 7px;
+  background: linear-gradient(135deg, #7eb1ff 0%, #b48cff 55%, #ef5d75 110%);
+  background-size: 200% 200%;
+  animation: brandShift 11s ease-in-out infinite;
+  display: grid; place-items: center;
+  font-weight: 700; font-size: 11px; color: #0a0c12;
+  letter-spacing: -0.02em;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.25) inset,
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 6px 18px -6px rgba(126, 177, 255, 0.5);
+  flex-shrink: 0;
+}
+
+@keyframes brandShift {
+  0%, 100% { background-position: 0% 50%; }
+  50%       { background-position: 100% 50%; }
+}
+
+.brandSep {
+  width: 1px; height: 16px;
+  background: var(--border-2);
+  flex-shrink: 0;
+}
+
+/* ===== Project name input ===== */
+.projectName {
+  color: var(--text-0);
+  font-size: 13.5px;
+  font-weight: 500;
+  padding: 5px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  background: transparent;
+  outline: none;
+  min-width: 140px;
+  max-width: 380px;
+  transition: background 160ms var(--ease-out), border-color 160ms var(--ease-out), box-shadow 160ms var(--ease-out);
+}
+.projectName:hover { background: rgba(255, 255, 255, 0.03); }
+.projectName:focus {
+  background: rgba(126, 177, 255, 0.06);
+  border-color: rgba(126, 177, 255, 0.45);
+  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08);
+}
+/* キーボードフォーカス時は focus-visible が outline を付与するが、
+   border の変化でマウス操作でも視覚フィードバックを出す（:focus のまま）。 */
+.projectName:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
 .spacer { flex: 1; }
-.menu { position: relative; }
-.menu summary { list-style: none; cursor: pointer; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); }
+
+/* ===== Header actions (right cluster) ===== */
+.headerActions {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+
+/* vertical separator between button groups */
+.vSep {
+  width: 1px; height: 20px;
+  background: var(--border-2);
+  flex-shrink: 0;
+}
+
+/* ===== Buttons ===== */
+.btn {
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #25272e 0%, #1e1f25 100%);
+  border: 1px solid var(--border-2);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex; align-items: center; gap: 7px;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 140ms var(--ease-out);
+  position: relative;
+  overflow: hidden;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.btn:hover {
+  background: linear-gradient(180deg, #2c2e36 0%, #24252c 100%);
+  border-color: var(--border-strong);
+  color: var(--text-0);
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.06) inset,
+    0 6px 14px -6px rgba(0, 0, 0, 0.5);
+}
+.btn:active { transform: translateY(0); }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+/* primary variant: bright blue for the main CTA */
+.btnPrimary {
+  composes: btn;
+  background: linear-gradient(180deg, #8cbaff 0%, #6a9aef 100%);
+  border-color: #6a9aef;
+  color: #0a0e16;
+  font-weight: 600;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.35) inset,
+    0 -1px 0 rgba(0, 0, 0, 0.15) inset,
+    0 6px 18px -6px rgba(126, 177, 255, 0.55);
+}
+.btnPrimary:hover {
+  background: linear-gradient(180deg, #9dc6ff 0%, #7eaaf5 100%);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.4) inset,
+    0 8px 22px -6px rgba(126, 177, 255, 0.7);
+  color: #0a0e16;
+}
+/* shimmer sweep on primary hover — purely decorative motion */
+.btnPrimary::before {
+  content: "";
+  position: absolute;
+  top: 0; bottom: 0; left: -60%;
+  width: 40%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.35), transparent);
+  transform: skewX(-20deg);
+  transition: left 700ms var(--ease-out);
+  pointer-events: none;
+}
+.btnPrimary:hover::before { left: 130%; }
+
+/* ===== Dropdown menus (<details> disclosure pattern) ===== */
+.menu {
+  position: relative;
+}
+
+/* <summary> as the trigger button — styled to match .btn */
+.menu summary {
+  list-style: none;
+  cursor: pointer;
+  height: 30px;
+  padding: 0 12px;
+  border-radius: var(--radius-sm);
+  background: linear-gradient(180deg, #25272e 0%, #1e1f25 100%);
+  border: 1px solid var(--border-2);
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 500;
+  display: inline-flex; align-items: center;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 1px 2px rgba(0, 0, 0, 0.3);
+  transition: all 140ms var(--ease-out);
+  white-space: nowrap;
+  font-family: inherit;
+}
 .menu summary::-webkit-details-marker { display: none; }
-/* キーボード操作時に summary のフォーカスを可視化する（強制カラーモード対策も兼ねる）。 */
-.menu summary:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
-.menuItems { position: absolute; right: 0; top: 100%; margin-top: 4px; display: flex; flex-direction: column; gap: 4px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 6px; z-index: 10; white-space: nowrap; }
+.menu summary:hover {
+  background: linear-gradient(180deg, #2c2e36 0%, #24252c 100%);
+  border-color: var(--border-strong);
+  color: var(--text-0);
+}
+.menu summary:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+/* popup panel */
+.menuItems {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 6px);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: 4px;
+  z-index: 100;
+  white-space: nowrap;
+  box-shadow: var(--shadow-pop);
+  min-width: 160px;
+}
+
+/* menu item buttons inside popup */
+.menuItems button {
+  width: 100%;
+  height: 30px;
+  padding: 0 10px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-1);
+  font-size: 12px;
+  font-weight: 500;
+  display: flex; align-items: center;
+  text-align: left;
+  cursor: pointer;
+  transition: all 120ms var(--ease-out);
+  font-family: inherit;
+}
+.menuItems button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-0);
+  border-color: rgba(255, 255, 255, 0.06);
+}
+.menuItems button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

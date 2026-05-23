@@ -1,3 +1,16 @@
-/* App レイアウト: Header を固定ヘッダとして上に置き、body で残高を埋める 2カラム構成 */
-.app { display: flex; flex-direction: column; height: 100%; }
-.body { display: flex; flex: 1; min-height: 0; }
+/* App レイアウト: CSS Grid で header / sidebar / main の3エリアを宣言する。
+ * Why grid (not flex): named areas で各コンポーネントが grid-area を自己申告できる。
+ * z-index: 1 で body の ::before / ::after 疑似要素（グリッド・グレイン、z-index: 0）より
+ * 手前に描画し、装飾レイヤーが UI を隠さないようにする。
+ */
+.app {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: 52px 1fr;
+  grid-template-columns: 260px 1fr;
+  grid-template-areas:
+    "header header"
+    "side   main";
+  height: 100vh;
+}

@@ -1,10 +1,257 @@
-/* src/components/LineRow/LineRow.module.css */
-.row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-left-width: 4px; border-radius: 6px; }
-.num { width: 2.5em; text-align: right; color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
-.select { width: 8em; flex-shrink: 0; }
-.text { flex: 1; font-family: var(--font-mono); }
-.count { width: 3em; text-align: right; color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
-.actions { display: flex; gap: 2px; }
-.actions button { padding: 4px 8px; }
-/* --color-danger で削除ボタンに破壊操作の視覚的アフォーダンスを提供する。 */
-.deleteButton:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }
+/* LineRow.module.css
+ *
+ * Why CSS Grid for .row: 5列固定（番号/キャラ/セリフ/文字数/アクション）で
+ * セリフ列だけ 1fr で伸縮させる。flex だとキャラ選択の幅が揺れる。
+ *
+ * --char 変数: 行ルート要素に style で注入されるキャラ色 hex。
+ * left accent bar (::before) / focused num / char-select の左バーに使う。
+ */
+
+/* ===== Row container ===== */
+.row {
+  display: grid;
+  grid-template-columns: 36px 168px 1fr 60px auto;
+  align-items: center;
+  gap: 12px;
+  padding: 6px 10px 6px 4px;
+  border-radius: var(--radius);
+  border: 1px solid transparent;
+  transition:
+    background 180ms var(--ease-out),
+    border-color 180ms var(--ease-out),
+    box-shadow 220ms var(--ease-out),
+    transform 180ms var(--ease-out);
+  position: relative;
+  /* entry animation — 最初の数行だけ delay（nth-child 7以降は 0ms の delay で即出現）*/
+  animation: rowIn 420ms var(--ease-out) backwards;
+}
+
+/* nth-child entry stagger — Why: リスト出現時に視覚的な流れを作る（最大7行分）。 */
+.row:nth-child(1) { animation-delay: 40ms; }
+.row:nth-child(2) { animation-delay: 90ms; }
+.row:nth-child(3) { animation-delay: 140ms; }
+.row:nth-child(4) { animation-delay: 190ms; }
+.row:nth-child(5) { animation-delay: 240ms; }
+.row:nth-child(6) { animation-delay: 290ms; }
+.row:nth-child(7) { animation-delay: 340ms; }
+
+@keyframes rowIn {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+/* left accent bar: キャラ色を ::before で縦線として表示。ホバー/フォーカスで出現。 */
+.row::before {
+  content: "";
+  position: absolute;
+  left: -1px; top: 8px; bottom: 8px;
+  width: 2px;
+  border-radius: 2px;
+  background: var(--char, transparent);
+  opacity: 0;
+  transform: scaleY(0.4);
+  transform-origin: center;
+  transition: opacity 220ms var(--ease-out), transform 260ms var(--ease-out);
+  pointer-events: none;
+}
+
+.row:hover {
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.025), rgba(255, 255, 255, 0.015));
+  border-color: rgba(255, 255, 255, 0.06);
+  box-shadow: var(--shadow-row);
+}
+.row:hover::before { opacity: 0.9; transform: scaleY(1); }
+
+/* focused: セリフ入力フォーカス中に行全体をハイライト */
+.row.focused {
+  background:
+    radial-gradient(600px 60px at 30% 50%, rgba(126, 177, 255, 0.05), transparent 70%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.03), rgba(255, 255, 255, 0.012));
+  border-color: rgba(126, 177, 255, 0.22);
+  box-shadow:
+    0 0 0 1px rgba(126, 177, 255, 0.06),
+    0 12px 28px -14px rgba(126, 177, 255, 0.25),
+    var(--shadow-row);
+}
+.row.focused::before { opacity: 1; transform: scaleY(1); }
+
+/* ===== Line number ===== */
+.num {
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+  user-select: none;
+  transition: color 160ms;
+}
+.row:hover .num { color: var(--text-2); }
+/* focused 時: キャラ色で行番号を染める（--char が注入されている前提） */
+.row.focused .num { color: var(--char); }
+
+/* ===== Character select wrapper ===== */
+/* Why wrapper: native <select> はブラウザ標準 a11y を保つ。左バーの色表現は wrapper に委ねる。 */
+.charSelectWrapper {
+  position: relative;
+  height: 34px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: linear-gradient(180deg, rgba(36, 38, 45, 0.6), rgba(28, 29, 34, 0.6));
+  border: 1px solid var(--border-1);
+  display: flex; align-items: stretch;
+  transition: all 160ms var(--ease-out);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03) inset;
+}
+.row:hover .charSelectWrapper {
+  border-color: var(--border-2);
+  background: linear-gradient(180deg, rgba(42, 44, 52, 0.7), rgba(32, 34, 40, 0.7));
+}
+
+/* キャラ色の左バー — ::before で wrapper の左端に描画 */
+.charSelectWrapper::before {
+  content: "";
+  width: 3px;
+  flex-shrink: 0;
+  align-self: stretch;
+  background: var(--char, var(--text-4));
+  box-shadow: 0 0 12px var(--char, transparent);
+}
+
+/* native <select>: 上に重ねて透明で操作させる。クリック・キーボード・スクリーンリーダー全対応。 */
+.charSelect {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  cursor: pointer;
+  z-index: 1;
+}
+
+/* 表示用のキャラ名テキスト（select の上に重ねる装飾レイヤー） */
+.charDisplay {
+  flex: 1;
+  display: flex; align-items: center;
+  padding: 0 8px;
+  color: var(--text-0);
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  pointer-events: none; /* クリックを下の select に透過させる */
+}
+
+/* ===== Dialogue text input ===== */
+.dialogue {
+  height: 34px;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  padding: 0 12px;
+  font-family: var(--font-mono);
+  font-size: 13px;
+  outline: none;
+  width: 100%;
+  transition: all 160ms var(--ease-out);
+  caret-color: var(--accent);
+}
+.dialogue::placeholder { color: var(--text-3); font-family: var(--font-ui); }
+.row:hover .dialogue {
+  background: rgba(0, 0, 0, 0.25);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+.dialogue:focus {
+  background: rgba(126, 177, 255, 0.04);
+  border-color: rgba(126, 177, 255, 0.4);
+  box-shadow: 0 0 0 3px rgba(126, 177, 255, 0.08);
+}
+.dialogue:focus-visible {
+  outline: none; /* box-shadow でフォーカスを代替。強制カラーモードでは別途対応済み（global.css）。 */
+}
+
+/* ===== Character count badge =====
+ * Why warn / long:
+ *   読み上げ字幕の目安。閾値は暫定ヒューリスティック（LineRow.tsx に定数として定義）。
+ *   長いセリフは字幕テロップが切れる可能性があるため色で警告する。
+ *   文字数の表示値そのものは変えない（カウントが見えなくなると逆効果）。
+ */
+.countBadge {
+  justify-self: end;
+  color: var(--text-3);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: transparent;
+  border: 1px solid transparent;
+  min-width: 40px;
+  text-align: center;
+  transition: all 200ms var(--ease-out);
+}
+.row:hover .countBadge {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.05);
+}
+
+/* warn: 25文字以上 (LINE_WARN_CHARS) */
+.countBadge.warn { color: var(--warn); }
+.row:hover .countBadge.warn {
+  color: #f7c785;
+  background: rgba(239, 179, 95, 0.10);
+  border-color: rgba(239, 179, 95, 0.25);
+}
+
+/* long: 40文字以上 (LINE_LONG_CHARS) */
+.countBadge.long { color: var(--danger); }
+.row:hover .countBadge.long {
+  color: #f48a8a;
+  background: rgba(239, 106, 106, 0.10);
+  border-color: rgba(239, 106, 106, 0.25);
+}
+
+/* ===== Action buttons ===== */
+.actions {
+  display: flex; align-items: center; gap: 1px;
+  background: linear-gradient(180deg, rgba(36, 38, 45, 0.85), rgba(28, 29, 34, 0.85));
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  padding: 2px;
+  opacity: 0;
+  transform: translateX(6px);
+  transition: opacity 200ms var(--ease-out), transform 220ms var(--ease-out);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 12px -6px rgba(0, 0, 0, 0.5);
+}
+.row:hover .actions { opacity: 1; transform: translateX(0); }
+
+.action {
+  width: 24px; height: 24px;
+  border: none;
+  background: transparent;
+  color: var(--text-2);
+  border-radius: 3px;
+  display: grid; place-items: center;
+  transition: all 120ms var(--ease-out);
+  cursor: pointer;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 1;
+}
+.action:hover { background: rgba(255, 255, 255, 0.07); color: var(--text-0); transform: translateY(-1px); }
+.action:disabled { opacity: 0.25; cursor: not-allowed; transform: none; }
+.action:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+
+/* 削除ボタン: 赤系ホバーで破壊操作のアフォーダンスを提供 */
+.actionDel:hover { background: rgba(239, 106, 106, 0.18); color: var(--danger); }
+
+.actionsSep {
+  width: 1px; height: 14px;
+  background: rgba(255, 255, 255, 0.07);
+  margin: 0 2px;
+  flex-shrink: 0;
+}

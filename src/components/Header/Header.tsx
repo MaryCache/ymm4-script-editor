@@ -73,31 +73,47 @@ export function Header(props: HeaderProps) {
 
   return (
     <header className={styles.header}>
-      <input
-        className={styles.projectName}
-        value={projectName}
-        onChange={(e: ChangeEvent<HTMLInputElement>) => onProjectNameChange(e.target.value)}
-        aria-label="プロジェクト名"
-      />
+      {/* ===== Left: brand mark + project name ===== */}
+      <div className={styles.brand}>
+        {/* aria-hidden: 純粋な装飾ロゴ。スクリーンリーダーに読ませない。 */}
+        <div className={styles.brandMark} aria-hidden="true">Y4</div>
+        <div className={styles.brandSep} aria-hidden="true" />
+        <input
+          className={styles.projectName}
+          value={projectName}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => onProjectNameChange(e.target.value)}
+          aria-label="プロジェクト名"
+        />
+      </div>
+
       <div className={styles.spacer} />
-      <button onClick={onCopyAll}>全件コピー</button>
 
-      <details className={styles.menu}>
-        <summary>保存▼</summary>
-        <div className={styles.menuItems}>
-          <button onClick={runAndCloseMenu(onSaveYmscript)}>.ymscript として保存</button>
-          <button onClick={runAndCloseMenu(onSaveMarkdown)}>.md として保存</button>
-          <button onClick={runAndCloseMenu(onExportCSV)}>CSV を書き出す</button>
-        </div>
-      </details>
+      {/* ===== Right: action buttons ===== */}
+      <div className={styles.headerActions}>
+        {/* 全件コピー: primary variant で最重要 CTA として強調 */}
+        <button className={styles.btnPrimary} onClick={onCopyAll}>全件コピー</button>
 
-      <details className={styles.menu}>
-        <summary>読込▼</summary>
-        <div className={styles.menuItems}>
-          <button onClick={openYmscriptPicker}>.ymscript を読み込む</button>
-          <button onClick={openMarkdownPicker}>.md を読み込む</button>
-        </div>
-      </details>
+        <div className={styles.vSep} aria-hidden="true" />
+
+        {/* 保存メニュー */}
+        <details className={styles.menu}>
+          <summary>保存▼</summary>
+          <div className={styles.menuItems}>
+            <button onClick={runAndCloseMenu(onSaveYmscript)}>.ymscript として保存</button>
+            <button onClick={runAndCloseMenu(onSaveMarkdown)}>.md として保存</button>
+            <button onClick={runAndCloseMenu(onExportCSV)}>CSV を書き出す</button>
+          </div>
+        </details>
+
+        {/* 読込メニュー */}
+        <details className={styles.menu}>
+          <summary>読込▼</summary>
+          <div className={styles.menuItems}>
+            <button onClick={openYmscriptPicker}>.ymscript を読み込む</button>
+            <button onClick={openMarkdownPicker}>.md を読み込む</button>
+          </div>
+        </details>
+      </div>
 
       {/* aria-label でテストから取得可能にする（a11y 改善も兼ねる）。 */}
       <input
