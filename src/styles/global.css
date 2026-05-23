@@ -1,0 +1,41 @@
+/* src/styles/global.css */
+:root {
+  --color-bg: #0f1117;
+  --color-surface: #1c1e2a;
+  --color-border: #2c2e3e;
+  --color-text: #d4d8f0;
+  --color-text-sub: #7a80a0;
+  --color-accent: #5b8dff;
+  --color-danger: #ff5c5c;
+  --color-success: #4caf81;
+  --font-sans: "Noto Sans JP", system-ui, sans-serif;
+  --font-mono: "Fira Code", "Consolas", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body, #root { height: 100%; }
+
+body {
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+}
+
+button {
+  font: inherit; color: inherit;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: 6px; padding: 6px 12px; cursor: pointer;
+}
+button:hover:not(:disabled) { border-color: var(--color-accent); }
+button:disabled { opacity: 0.4; cursor: not-allowed; }
+
+input, select {
+  font: inherit; color: inherit;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px; padding: 6px 10px;
+}
+input:focus, select:focus { outline: none; border-color: var(--color-accent); }
