@@ -1,0 +1,8 @@
+/* src/components/LineRow/LineRow.module.css */
+.row { display: flex; align-items: center; gap: 8px; padding: 6px 10px; background: var(--color-surface); border: 1px solid var(--color-border); border-left-width: 4px; border-radius: 6px; }
+.num { width: 2.5em; text-align: right; color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
+.select { width: 8em; flex-shrink: 0; }
+.text { flex: 1; font-family: var(--font-mono); }
+.count { width: 3em; text-align: right; color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
+.actions { display: flex; gap: 2px; }
+.actions button { padding: 4px 8px; }
