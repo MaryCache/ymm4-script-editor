@@ -63,3 +63,48 @@ test("直後に行を追加ボタンで onAddAfter が line.id 付きで呼ば�
   await userEvent.click(screen.getByRole("button", { name: "直後に行を追加" }));
   expect(onAddAfter).toHaveBeenCalledWith(line.id);
 });
+
+// item 4: 独自ドロップダウン — トグルボタンが aria-label="キャラクター" で存在する
+test("キャラクタートグルボタンが存在し aria-label='キャラクター' を持つ", () => {
+  render(<LineRow {...baseProps} />);
+  expect(screen.getByRole("button", { name: "キャラクター" })).toBeInTheDocument();
+});
+
+// item 4: トグルをクリックするとリストが開く
+test("キャラクタートグルをクリックするとリストが開く", async () => {
+  render(<LineRow {...baseProps} />);
+  await userEvent.click(screen.getByRole("button", { name: "キャラクター" }));
+  expect(screen.getByRole("listbox", { name: "キャラクター選択" })).toBeInTheDocument();
+  expect(screen.getAllByRole("option")).toHaveLength(2);
+});
+
+// item 4: キャラを選択すると onCharacterChange が呼ばれ、リストが閉じる
+test("キャラを選択すると onCharacterChange が呼ばれる", async () => {
+  const onCharacterChange = vi.fn();
+  render(<LineRow {...baseProps} onCharacterChange={onCharacterChange} />);
+  await userEvent.click(screen.getByRole("button", { name: "キャラクター" }));
+  // 魔理沙を選択
+  await userEvent.click(screen.getByRole("option", { name: /魔理沙/ }));
+  expect(onCharacterChange).toHaveBeenCalledWith("l1", "c2");
+  // リストが閉じる
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+});
+
+// item 4: Escape キーでリストが閉じる
+test("Escape キーでドロップダウンが閉じる", async () => {
+  render(<LineRow {...baseProps} />);
+  await userEvent.click(screen.getByRole("button", { name: "キャラクター" }));
+  expect(screen.getByRole("listbox")).toBeInTheDocument();
+  await userEvent.keyboard("{Escape}");
+  expect(screen.queryByRole("listbox")).not.toBeInTheDocument();
+});
+
+// item 4: 選択中項目に aria-selected="true" が付く
+test("選択中キャラの option に aria-selected=true が付く", async () => {
+  render(<LineRow {...baseProps} />);
+  await userEvent.click(screen.getByRole("button", { name: "キャラクター" }));
+  const options = screen.getAllByRole("option");
+  // c1="霊夢" が選択中
+  expect(options[0]).toHaveAttribute("aria-selected", "true");
+  expect(options[1]).toHaveAttribute("aria-selected", "false");
+});

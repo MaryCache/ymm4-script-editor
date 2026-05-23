@@ -1,5 +1,5 @@
 // src/components/LineRow/LineRow.tsx
-import { memo, useState, forwardRef, type ChangeEvent } from "react";
+import { memo, useState, useRef, useEffect, forwardRef, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
 import type { Character, Line } from "../../types";
 import styles from "./LineRow.module.css";
 
@@ -27,6 +27,167 @@ export type LineRowProps = {
   onCopy: (line: Line) => void;
 };
 
+// ===== 独自キャラクタードロップダウン (item 4) =====
+// アクセシブルな listbox パターン。
+// - トグル: button[aria-haspopup="listbox"][aria-expanded]
+// - ポップアップ: role="listbox" aria-label="キャラクター選択"
+// - 各項目: role="option" aria-selected
+// - キーボード: Enter/Space 開閉、↑↓ 移動、Enter 確定、Escape 閉じる
+// - open 状態は LineRow 内 local state（NF-10: 他行に波及しない）
+// - 外側クリックで閉じる（useOutsideClick 相当、標準 blur で対応）
+
+type CharDropdownProps = {
+  lineId: string;
+  characterId: string;
+  characters: Character[];
+  onCharacterChange: (lineId: string, charId: string) => void;
+  rowStyle: React.CSSProperties;
+};
+
+function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowStyle }: CharDropdownProps) {
+  const [open, setOpen] = useState(false);
+  // focusedIndex: ↑↓ キーで移動するフォーカス位置（-1 は未フォーカス）
+  const [focusedIndex, setFocusedIndex] = useState(-1);
+  const toggleRef = useRef<HTMLButtonElement>(null);
+  const listRef = useRef<HTMLDivElement>(null);
+
+  const selectedChar = characters.find((c) => c.id === characterId);
+  const selectedColor = selectedChar?.color ?? "transparent";
+  const selectedName = selectedChar?.name ?? "";
+
+  // 開く: focusedIndex を選択中の index に合わせる
+  const openDropdown = () => {
+    const idx = characters.findIndex((c) => c.id === characterId);
+    setFocusedIndex(idx >= 0 ? idx : 0);
+    setOpen(true);
+  };
+
+  const closeDropdown = () => {
+    setOpen(false);
+    setFocusedIndex(-1);
+    // トグルボタンにフォーカスを戻す
+    toggleRef.current?.focus();
+  };
+
+  const selectChar = (charId: string) => {
+    onCharacterChange(lineId, charId);
+    closeDropdown();
+  };
+
+  // 外側クリックで閉じる
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (
+        !toggleRef.current?.contains(e.target as Node) &&
+        !listRef.current?.contains(e.target as Node)
+      ) {
+        setOpen(false);
+        setFocusedIndex(-1);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, [open]);
+
+  // 開いたら focusedIndex の option にフォーカスを移す
+  useEffect(() => {
+    if (!open || focusedIndex < 0) return;
+    const items = listRef.current?.querySelectorAll<HTMLElement>("[role='option']");
+    items?.[focusedIndex]?.focus();
+  }, [open, focusedIndex]);
+
+  // トグルのキーボード操作
+  const handleToggleKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (open) { closeDropdown(); } else { openDropdown(); }
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      if (!open) { openDropdown(); }
+    } else if (e.key === "Escape") {
+      if (open) { e.stopPropagation(); closeDropdown(); }
+    }
+  };
+
+  // リスト項目のキーボード操作
+  const handleOptionKeyDown = (e: ReactKeyboardEvent<HTMLElement>, idx: number) => {
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      const next = Math.min(idx + 1, characters.length - 1);
+      setFocusedIndex(next);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      const prev = Math.max(idx - 1, 0);
+      setFocusedIndex(prev);
+    } else if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      const char = characters[idx];
+      if (char) selectChar(char.id);
+    } else if (e.key === "Escape" || e.key === "Tab") {
+      e.preventDefault();
+      closeDropdown();
+    }
+  };
+
+  return (
+    <div className={styles.charSelectWrapper} style={rowStyle}>
+      {/* キャラ色の左バー: wrapper の ::before で描画（既存スタイル流用） */}
+      {/* トグルボタン: aria-haspopup="listbox" aria-expanded */}
+      <button
+        ref={toggleRef}
+        className={styles.charToggleBtn}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        aria-label="キャラクター"
+        type="button"
+        onClick={() => { if (open) { closeDropdown(); } else { openDropdown(); } }}
+        onKeyDown={handleToggleKeyDown}
+      >
+        {/* 色ドット */}
+        <span
+          className={styles.charDot}
+          style={{ background: selectedColor }}
+          aria-hidden="true"
+        />
+        {/* キャラ名 */}
+        <span className={styles.charDisplay}>{selectedName}</span>
+        {/* シェブロン ▼ */}
+        <span className={`${styles.charChevron} ${open ? styles.charChevronOpen : ""}`} aria-hidden="true">▼</span>
+      </button>
+
+      {/* ポップアップリスト */}
+      {open && (
+        <div
+          ref={listRef}
+          role="listbox"
+          aria-label="キャラクター選択"
+          className={styles.charListbox}
+        >
+          {characters.map((c, idx) => (
+            <div
+              key={c.id}
+              role="option"
+              aria-selected={c.id === characterId}
+              className={`${styles.charOption} ${c.id === characterId ? styles.charOptionSelected : ""}`}
+              tabIndex={-1}
+              onClick={() => selectChar(c.id)}
+              onKeyDown={(e) => handleOptionKeyDown(e, idx)}
+            >
+              <span
+                className={styles.charDot}
+                style={{ background: c.color }}
+                aria-hidden="true"
+              />
+              <span>{c.name}</span>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // React.memo + forwardRef:
 //   memo: props（line/characters/handlers）が参照同値なら再描画をスキップ（NF-10）。
 //   forwardRef: ScriptEditor の useFLIP が FLIP アニメーションのために各行の DOM ノードを
@@ -45,9 +206,6 @@ export const LineRow = memo(forwardRef<HTMLDivElement, LineRowProps>(function Li
 
   // キャラ色: 選択中キャラの hex。見つからない場合は transparent（CSS 変数のフォールバック）。
   const color = characters.find((c) => c.id === line.characterId)?.color ?? "transparent";
-
-  // 現在選択中のキャラ名（charDisplay に表示する装飾テキスト）
-  const charName = characters.find((c) => c.id === line.characterId)?.name ?? "";
 
   // count-badge の状態判定
   const len = line.text.length;
@@ -75,29 +233,18 @@ export const LineRow = memo(forwardRef<HTMLDivElement, LineRowProps>(function Li
       {/* 行番号 — 可視テキストは index+1 */}
       <span className={styles.num}>{index + 1}</span>
 
-      {/* ===== Character select =====
-       * Why wrapper + native select:
-       *   native <select> はブラウザ・スクリーンリーダー・キーボード操作の
-       *   標準実装をそのまま使う（a11y 最優先、NF-02 準拠）。
-       *   左バーの色バー（::before）と表示名（charDisplay）は wrapper / 装飾要素で対応。
-       *   select 自体は opacity: 0 で上に被せてクリックを受け取る。
+      {/* ===== Character dropdown (item 4: 独自アクセシブルドロップダウン) =====
+       * CharDropdown コンポーネント: listbox パターン。
+       * open 状態は LineRow 内 local state（NF-10: 他行に波及しない）。
+       * CharDropdown 内で open 管理するため、LineRow は rowStyle を渡すだけ。
        */}
-      <div className={styles.charSelectWrapper} style={rowStyle}>
-        {/* 装飾テキスト — pointer-events: none でクリックを select に透過 */}
-        <span className={styles.charDisplay} aria-hidden="true">{charName}</span>
-        <select
-          className={styles.charSelect}
-          aria-label="キャラクター"
-          value={line.characterId}
-          onChange={(e: ChangeEvent<HTMLSelectElement>) =>
-            props.onCharacterChange(line.id, e.target.value)
-          }
-        >
-          {characters.map((c) => (
-            <option key={c.id} value={c.id}>{c.name}</option>
-          ))}
-        </select>
-      </div>
+      <CharDropdown
+        lineId={line.id}
+        characterId={line.characterId}
+        characters={characters}
+        onCharacterChange={props.onCharacterChange}
+        rowStyle={rowStyle}
+      />
 
       {/* ===== Dialogue input ===== */}
       <input

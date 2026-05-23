@@ -97,13 +97,16 @@
 /* focused 時: キャラ色で行番号を染める（--char が注入されている前提） */
 .focused .num { color: var(--char); }
 
-/* ===== Character select wrapper ===== */
-/* Why wrapper: native <select> はブラウザ標準 a11y を保つ。左バーの色表現は wrapper に委ねる。 */
+/* ===== Character select wrapper (item 4: 独自ドロップダウンのコンテナ) =====
+ * position: relative でポップアップリストのアンカーにする。
+ * overflow: visible に変更（listbox がはみ出る必要がある）。
+ * 左バー (::before) はそのまま維持。
+ */
 .charSelectWrapper {
   position: relative;
   height: 34px;
   border-radius: var(--radius-sm);
-  overflow: hidden;
+  overflow: visible; /* listbox がはみ出るため visible */
   background: linear-gradient(180deg, rgba(8, 33, 51, 0.7), rgba(4, 24, 42, 0.7));
   border: 1px solid var(--border-1);
   display: flex; align-items: stretch;
@@ -123,31 +126,142 @@
   align-self: stretch;
   background: var(--char, var(--text-4));
   box-shadow: 0 0 12px var(--char, transparent);
+  border-radius: var(--radius-sm) 0 0 var(--radius-sm);
 }
 
-/* native <select>: 上に重ねて透明で操作させる。クリック・キーボード・スクリーンリーダー全対応。 */
-.charSelect {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  opacity: 0;
-  cursor: pointer;
-  z-index: 1;
-}
-
-/* 表示用のキャラ名テキスト（select の上に重ねる装飾レイヤー） */
-.charDisplay {
+/* ===== トグルボタン (item 4) =====
+ * 左バー::before の右に配置。flex: 1 で残幅を占有。
+ * 色ドット＋キャラ名＋シェブロン の水平レイアウト。
+ */
+.charToggleBtn {
   flex: 1;
-  display: flex; align-items: center;
+  display: flex; align-items: center; gap: 6px;
   padding: 0 8px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-family: inherit;
   color: var(--text-0);
   font-size: 12.5px;
   font-weight: 500;
+  min-width: 0;
+  outline: none;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  transition: background 120ms var(--ease-out);
+}
+.charToggleBtn:hover {
+  background: rgba(16, 125, 200, 0.08);
+}
+.charToggleBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+}
+
+/* 色ドット: 小さな丸でキャラ色を示す */
+.charDot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  display: inline-block;
+  box-shadow: 0 0 6px currentColor;
+}
+
+/* キャラ名テキスト */
+.charDisplay {
+  flex: 1;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  pointer-events: none; /* クリックを下の select に透過させる */
+}
+
+/* シェブロン ▼: 開いたとき 180deg 回転（submenu-icon-rotate: hover-feedback-family / cygames-corporate）
+ * 開閉の合図を rotate で伝える。0.3s ease。
+ */
+.charChevron {
+  font-size: 9px;
+  color: var(--text-3);
+  flex-shrink: 0;
+  display: inline-block;
+  transition: transform 0.3s ease;
+}
+.charChevronOpen {
+  transform: rotate(180deg);
+}
+
+/* ===== ポップアップリスト (item 4: listbox) =====
+ * position: absolute で wrapper 直下に表示。
+ * z-index: 200 で全 UI より前面（行ボタン群より高く）。
+ */
+.charListbox {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: -1px; /* wrapper の左バー分だけ左にずらして揃える */
+  min-width: calc(100% + 2px);
+  background: var(--bg-2);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius);
+  padding: 4px;
+  z-index: 200;
+  box-shadow: var(--shadow-pop);
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  animation: charListboxEnter 0.18s ease both;
+}
+
+@keyframes charListboxEnter {
+  from { opacity: 0; transform: translateY(-6px) scaleY(0.95); }
+  to   { opacity: 1; transform: translateY(0) scaleY(1); }
+}
+
+/* ===== listbox 項目 (item 4: option) ===== */
+.charOption {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 10px;
+  height: 30px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-1);
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 100ms var(--ease-out);
+  outline: none;
+  font-family: inherit;
+}
+.charOption:hover {
+  background: rgba(16, 125, 200, 0.10);
+  color: var(--text-0);
+  border-color: rgba(16, 125, 200, 0.15);
+}
+.charOption:focus {
+  background: rgba(16, 125, 200, 0.13);
+  color: var(--text-0);
+  border-color: rgba(16, 125, 200, 0.30);
+  outline: none;
+}
+.charOption:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+}
+
+/* 選択中の項目: アクセントカラーで強調 */
+.charOptionSelected {
+  color: var(--accent-2);
+  font-weight: 600;
+}
+.charOptionSelected::after {
+  content: "✓";
+  margin-left: auto;
+  font-size: 10px;
+  color: var(--accent);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .charListbox { animation: none; }
+  .charChevron { transition: none; }
 }
 
 /* ===== Dialogue text input ===== */
