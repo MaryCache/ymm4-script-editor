@@ -7,7 +7,10 @@ import type { Character, Line, Project } from "../types";
 export const sanitizeFilename = (name: string): string => {
   // eslint-disable-next-line no-control-regex
   const sanitized = name.replace(/[/\\:*?"<>|\x00-\x1f]/g, "_").trim();
-  return sanitized.length > 0 ? sanitized : "untitled";
+  // 空文字だけでなく全てアンダースコア（例: "???" → "___"）の場合も意味のある名前がないため
+  // "untitled" にフォールバックする。サニタイズ前の元の名前が有効文字を含まなかった証拠。
+  if (sanitized.length === 0 || /^_+$/.test(sanitized)) return "untitled";
+  return sanitized;
 };
 
 export const downloadBlob = (blob: Blob, filename: string): void => {

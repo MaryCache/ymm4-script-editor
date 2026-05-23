@@ -1,70 +1,93 @@
-import { useCallback, useRef } from "react";
+import { useCallback } from "react";
 import { useProject } from "./hooks/useProject";
 import { Header } from "./components/Header/Header";
 import { CharacterPanel } from "./components/CharacterPanel/CharacterPanel";
 import { ScriptEditor } from "./components/ScriptEditor/ScriptEditor";
 import { buildLineCSV } from "./utils/csv";
-import type { Character, Line } from "./types";
+import type { Line } from "./types";
 import styles from "./App.module.css";
 
 export default function App() {
-  const p = useProject();
+  const {
+    project,
+    setProjectName,
+    addCharacter,
+    deleteCharacter,
+    addLineAtEnd,
+    addLineAfter,
+    deleteLine,
+    updateLineCharacter,
+    updateLineText,
+    moveLine,
+    saveToFile,
+    loadFromFile,
+    exportCSV,
+    exportMarkdown,
+    importMarkdown: importMd,
+    exportCSVToClipboard,
+  } = useProject();
 
-  // copyLine を安定参照に保つため、最新 characters を ref 経由で参照（依存ゼロ）。
-  // これにより useCallback([]) で包めて、全 LineRow へ渡すハンドラが再生成されない（NF-10）。
-  const charsRef = useRef<Character[]>(p.project.characters);
-  charsRef.current = p.project.characters;
-
+  // copyLine は characters が変わった時のみ再生成。テキスト編集では characters 参照は不変なので、
+  // 毎打鍵で LineRow が再描画されることはない（NF-10 維持）。
+  // charsRef.current = ... をレンダー中に書く旧実装は react-hooks/refs 違反のため廃止（C-1）。
   const copyLine = useCallback((line: Line) => {
     navigator.clipboard
-      .writeText(buildLineCSV(line, charsRef.current))
-      .catch((e) => console.error("コピーに失敗しました", e));
-  }, []);
+      .writeText(buildLineCSV(line, project.characters))
+      .catch((e) => {
+        console.error("コピーに失敗しました", e);
+        alert("コピーに失敗しました。");
+      });
+  }, [project.characters]);
 
-  // moveLine のラッパ: moveLine は安定だが引数変換が必要なため useCallback で包む
-  const onMoveUp = useCallback((id: string) => p.moveLine(id, "up"), [p.moveLine]);
-  const onMoveDown = useCallback((id: string) => p.moveLine(id, "down"), [p.moveLine]);
+  // moveLine のラッパ: moveLine は安定参照だが引数変換が必要なため useCallback で包む
+  const onMoveUp = useCallback((id: string) => moveLine(id, "up"), [moveLine]);
+  const onMoveDown = useCallback((id: string) => moveLine(id, "down"), [moveLine]);
 
   // importMarkdown: skipped>0 でユーザー通知、失敗は alert（useProject 側が throw する）
   const importMarkdown = useCallback((file: File) => {
-    p.importMarkdown(file)
+    importMd(file)
       .then((skipped) => { if (skipped > 0) alert(`${skipped} 行を読み込めずスキップしました。`); })
       .catch(() => alert("Markdown の読み込みに失敗しました。"));
-  }, [p.importMarkdown]);
+  }, [importMd]);
 
   // loadYmscript: 失敗は alert（useProject 内で throw された場合のみ）
   const loadYmscript = useCallback((file: File) => {
-    p.loadFromFile(file).catch(() => alert("プロジェクトファイルの読み込みに失敗しました。"));
-  }, [p.loadFromFile]);
+    loadFromFile(file).catch(() => alert("プロジェクトファイルの読み込みに失敗しました。"));
+  }, [loadFromFile]);
+
+  // 全件コピー失敗はユーザーに通知する（design §8, I-1）
+  const onCopyAll = useCallback(() => {
+    exportCSVToClipboard().catch(() => alert("クリップボードへのコピーに失敗しました。"));
+  }, [exportCSVToClipboard]);
 
   return (
     <div className={styles.app}>
       <Header
-        projectName={p.project.projectName}
-        onProjectNameChange={p.setProjectName}
-        onSaveYmscript={p.saveToFile}
-        onSaveMarkdown={p.exportMarkdown}
-        onExportCSV={p.exportCSV}
+        projectName={project.projectName}
+        onProjectNameChange={setProjectName}
+        onSaveYmscript={saveToFile}
+        onSaveMarkdown={exportMarkdown}
+        onExportCSV={exportCSV}
         onLoadYmscript={loadYmscript}
         onLoadMarkdown={importMarkdown}
-        onCopyAll={() => { void p.exportCSVToClipboard(); }}
+        onCopyAll={onCopyAll}
       />
       <div className={styles.body}>
         <CharacterPanel
-          characters={p.project.characters}
-          onAdd={p.addCharacter}
-          onDelete={p.deleteCharacter}
+          characters={project.characters}
+          onAdd={addCharacter}
+          onDelete={deleteCharacter}
         />
         <ScriptEditor
-          characters={p.project.characters}
-          lines={p.project.lines}
-          onAddLine={p.addLineAtEnd}
-          onCharacterChange={p.updateLineCharacter}
-          onTextChange={p.updateLineText}
+          characters={project.characters}
+          lines={project.lines}
+          onAddLine={addLineAtEnd}
+          onCharacterChange={updateLineCharacter}
+          onTextChange={updateLineText}
           onMoveUp={onMoveUp}
           onMoveDown={onMoveDown}
-          onAddAfter={p.addLineAfter}
-          onDelete={p.deleteLine}
+          onAddAfter={addLineAfter}
+          onDelete={deleteLine}
           onCopy={copyLine}
         />
       </div>

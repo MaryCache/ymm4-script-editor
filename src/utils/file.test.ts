@@ -52,3 +52,8 @@ test("sanitizeFilename: 空白のみは untitled にフォールバックする"
 test("sanitizeFilename: 前後の空白はトリムする", () => {
   expect(sanitizeFilename("  タイトル  ")).toBe("タイトル");
 });
+
+// M-3: 禁止文字のみからなる文字列（置換後が全アンダースコア）は untitled にフォールバックする
+test("sanitizeFilename: 禁止文字のみの文字列はアンダースコア列になるが untitled にフォールバックする", () => {
+  expect(sanitizeFilename("???")).toBe("untitled");
+});

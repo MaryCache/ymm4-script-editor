@@ -1,9 +1,14 @@
 /* src/components/CharacterPanel/CharacterPanel.module.css */
-.panel { width: 220px; flex-shrink: 0; padding: 16px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 12px; }
+/* min-height: 0 は flex 子として高さが縮めるために必要（overflow: hidden と組み合わせて
+   内部の .list スクロールが機能する）。overflow: hidden でパネル自体のはみ出しを防ぐ。 */
+.panel { width: 220px; flex-shrink: 0; padding: 16px; border-right: 1px solid var(--color-border); display: flex; flex-direction: column; gap: 12px; min-height: 0; overflow: hidden; }
 .title { font-size: 13px; color: var(--color-text-sub); }
 .form { display: flex; gap: 6px; }
 .form input { flex: 1; min-width: 0; }
-.list { list-style: none; display: flex; flex-direction: column; gap: 6px; }
+/* キャラ一覧が長くなってもパネルがはみ出さないようスクロール可能にする。
+   min-height: 0 は flex 子要素がコンテンツの高さより縮めるために必要（flex-shrink が効く前提）。
+   flex: 1 でパネルの残り高さを埋め、overflow-y: auto でスクロールバーを出す。 */
+.list { list-style: none; display: flex; flex-direction: column; gap: 6px; flex: 1; min-height: 0; overflow-y: auto; }
 .item { display: flex; align-items: center; gap: 8px; }
 .chip { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 .name { flex: 1; }

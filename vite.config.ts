@@ -16,6 +16,7 @@ export default defineConfig({
         short_name: "台本エディタ",
         start_url: "/",
         display: "standalone",
+        lang: "ja",
         background_color: "#0f1117",
         theme_color: "#5b8dff",
         icons: [

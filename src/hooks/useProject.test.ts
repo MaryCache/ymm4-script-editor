@@ -135,19 +135,34 @@ test("addLineAfter は直前行のキャラクターを引き継ぐ", () => {
   expect(result.current.project.lines[1]!.characterId).toBe(marisa.id);
 });
 
-// M-3: フロントマターあり Markdown を importMarkdown できる
+// I-4: 正しい project: キーの完全形式フロントマターあり Markdown を importMarkdown できる
 test("フロントマターあり Markdown を importMarkdown で読み込める", async () => {
   const { result } = renderHook(() => useProject());
+  // parseMarkdown が認識するフロントマター形式: project: + characters: ブロック
+  const frontmatter = [
+    "---",
+    "project: テスト台本",
+    "characters:",
+    "  - name: 霊夢",
+    '    color: "#FF6B6B"',
+    "  - name: 魔理沙",
+    '    color: "#4ECDC4"',
+    "---",
+  ].join("\n");
+  const body = "霊夢: こんにちは\n魔理沙: どうも";
   const md = new File(
-    ["---\ntitle: テスト台本\n---\n霊夢: こんにちは\n魔理沙: どうも"],
+    [`${frontmatter}\n${body}`],
     "with-frontmatter.md",
     { type: "text/markdown" },
   );
   let skipped = -1;
   await act(async () => { skipped = await result.current.importMarkdown(md); });
-  // フロントマターは行としてスキップされる
-  expect(result.current.project.lines.length).toBeGreaterThan(0);
-  expect(typeof skipped).toBe("number");
+  // projectName がフロントマターから読み込まれていること
+  expect(result.current.project.projectName).toBe("テスト台本");
+  // 本文の2行が読み込まれていること
+  expect(result.current.project.lines).toHaveLength(2);
+  // スキップなし
+  expect(skipped).toBe(0);
 });
 
 // M-4: moveLine の up 方向
