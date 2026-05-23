@@ -155,10 +155,10 @@
 }
 .addRow:hover .plus { transform: rotate(90deg); }
 
-/* ===== スクロールインジケーター (item 7: scroll-arrow-pulse — scroll-indicator.md / cygames-corporate)
+/* ===== 下向きスクロールインジケーター (scroll-arrow-pulse)
  * canScrollDown が true のとき表示。
- * linesScrollWrapper の bottom center に固定配置（position: absolute）。
- * 上下に脈動する矢印が「まだ下がある」を伝える（scroll-arrow-pulse: infinite loop）。
+ * linesScrollWrapper の bottom center に絶対配置。
+ * 上下に脈動する矢印が「まだ下がある」を伝える。
  * aria-hidden: 純粋装飾。
  * prefers-reduced-motion: reduce では脈動を止める（表示自体は残す）。
  */
@@ -172,7 +172,6 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  /* 表示時に fade-in */
   animation: scrollIndicatorFadeIn 0.3s ease both;
 }
 
@@ -180,9 +179,47 @@
   font-size: 12px;
   color: var(--accent-2);
   opacity: 0.7;
-  /* scroll-arrow-pulse: 上下に脈動（scroll-indicator.md / cygames-corporate） */
   animation: scrollArrowPulse 1.6s ease-in-out infinite;
   filter: drop-shadow(0 0 4px rgba(43, 180, 230, 0.5));
+}
+
+/* scroll-arrow-pulse: 下向き脈動 */
+@keyframes scrollArrowPulse {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50%       { transform: translateY(5px); opacity: 0.9; }
+}
+
+/* ===== 上向きスクロール促し矢印 (item 2: scroll-arrow-pulse 上向き版)
+ * canScrollUp (scrollTop > 8) の時に linesScrollWrapper の上部中央に表示。
+ * aria-hidden: 純粋装飾。
+ * prefers-reduced-motion: reduce では脈動を止める（表示は残す）。
+ */
+.scrollIndicatorTop {
+  position: absolute;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: none;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: scrollIndicatorFadeIn 0.3s ease both;
+}
+
+.scrollArrowUp {
+  font-size: 12px;
+  color: var(--accent-2);
+  opacity: 0.7;
+  /* scroll-arrow-pulse 上向き版: 上方向に脈動 */
+  animation: scrollArrowPulseUp 1.6s ease-in-out infinite;
+  filter: drop-shadow(0 0 4px rgba(43, 180, 230, 0.5));
+}
+
+/* scroll-arrow-pulse 上向き: 上方向に脈動 */
+@keyframes scrollArrowPulseUp {
+  0%, 100% { transform: translateY(0); opacity: 0.5; }
+  50%       { transform: translateY(-5px); opacity: 0.9; }
 }
 
 @keyframes scrollIndicatorFadeIn {
@@ -190,14 +227,62 @@
   to   { opacity: 1; }
 }
 
-/* scroll-arrow-pulse: 上下に脈動する矢印 */
-@keyframes scrollArrowPulse {
-  0%, 100% { transform: translateY(0); opacity: 0.5; }
-  50%       { transform: translateY(5px); opacity: 0.9; }
+/* ===== 一番上に戻るボタン (item 3: scroll-to-top-toggle — hover-feedback-family / nissan-jobs)
+ * scroll-to-top-toggle: opacity + translateY のトグルでふわっと表示/非表示。
+ * 位置: 右下（下部中央の促し矢印と重ならないよう右寄り）。
+ * aria-label="一番上に戻る"。
+ */
+.scrollToTop {
+  position: absolute;
+  bottom: 16px;
+  right: 16px;
+  z-index: 20;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: rgba(14, 44, 66, 0.85);
+  border: 1px solid var(--border-2);
+  color: var(--accent-2);
+  font-size: 11px;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: 0 4px 12px -4px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  /* scroll-to-top-toggle: 非表示状態（デフォルト） */
+  opacity: 0;
+  transform: translateY(8px);
+  pointer-events: none;
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
 }
 
-/* prefers-reduced-motion: 脈動を止める（表示自体は残す。item 7 要件） */
+/* 表示状態: opacity + translateY で浮かび上がる */
+.scrollToTopVisible {
+  opacity: 1;
+  transform: translateY(0);
+  pointer-events: auto;
+}
+
+.scrollToTop:hover {
+  background: rgba(16, 125, 200, 0.18);
+  border-color: rgba(16, 125, 200, 0.4);
+  color: var(--text-0);
+  box-shadow:
+    0 0 0 3px rgba(16, 125, 200, 0.12),
+    0 4px 12px -4px rgba(0, 0, 0, 0.5);
+}
+
+.scrollToTop:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* prefers-reduced-motion: 脈動を止める（表示自体は残す） */
 @media (prefers-reduced-motion: reduce) {
   .scrollArrow { animation: none; }
+  .scrollArrowUp { animation: none; }
   .scrollIndicator { animation: none; }
+  .scrollIndicatorTop { animation: none; }
+  .scrollToTop { transition: none; }
 }

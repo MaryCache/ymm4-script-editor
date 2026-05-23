@@ -33,7 +33,7 @@ export type ScriptEditorProps = {
 // duration: 220ms、ease: var(--ease-out)。
 // prefers-reduced-motion: reduce では FLIP をスキップ（位置変化は即時）。
 
-const FLIP_DURATION = 220; // ms — CSS transition と合わせる
+const FLIP_DURATION = 520; // ms — CSS transition と合わせる（item 7: 緩慢な移動）
 
 // 進行中の FLIP アニメーションの状態。
 // rafId: requestAnimationFrame の ID（キャンセル用）。
@@ -183,19 +183,32 @@ function useFLIP(signature: string) {
   return { getRowRef, addRowRef };
 }
 
-// ===== スクロールインジケーター (item 7) =====
+// ===== スクロールインジケーター =====
 // lines-scroll がオーバーフローし、かつ最下部でない時に下向き矢印のパルスを表示。
-// onScroll + ResizeObserver + lines 変化で canScrollDown を判定。
-// 最下部到達で fade-out 後に非表示。
+// canScrollUp: scrollTop > 8 の時に上向き矢印を表示（item 2）。
+// canScrollDown: 最下部でない時に下向き矢印を表示。
+// showScrollToTop: scrollTop が clientHeight を超えた時に戻るボタンを表示（item 3）。
+// onScroll + ResizeObserver + lines 変化で状態を判定。
 
 function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
   const [canScrollDown, setCanScrollDown] = useState(false);
+  const [canScrollUp, setCanScrollUp] = useState(false);
+  const [showScrollToTop, setShowScrollToTop] = useState(false);
 
   const check = useCallback(() => {
     const el = linesRef.current;
-    if (!el) { setCanScrollDown(false); return; }
-    const scrollable = el.scrollHeight - el.scrollTop - el.clientHeight > 8;
-    setCanScrollDown(scrollable);
+    if (!el) {
+      setCanScrollDown(false);
+      setCanScrollUp(false);
+      setShowScrollToTop(false);
+      return;
+    }
+    const scrollTop = el.scrollTop;
+    const clientHeight = el.clientHeight;
+    setCanScrollDown(el.scrollHeight - scrollTop - clientHeight > 8);
+    setCanScrollUp(scrollTop > 8);
+    // scroll-to-top-toggle: scrollTop が clientHeight を超えたら表示
+    setShowScrollToTop(scrollTop > (clientHeight || 8));
   }, [linesRef]);
 
   useEffect(() => {
@@ -212,7 +225,7 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
   }, [linesRef, check]);
 
   // lines 変化時も再チェック（行追加/削除でスクロール高が変わるため）
-  return { canScrollDown, recheckScroll: check };
+  return { canScrollDown, canScrollUp, showScrollToTop, recheckScroll: check };
 }
 
 export function ScriptEditor(props: ScriptEditorProps) {
@@ -225,14 +238,23 @@ export function ScriptEditor(props: ScriptEditorProps) {
   const orderSignature = props.lines.map((l) => l.id).join("|");
   const { getRowRef, addRowRef } = useFLIP(orderSignature);
 
-  // ===== スクロールインジケーター (item 7) =====
+  // ===== スクロールインジケーター =====
   const linesScrollRef = useRef<HTMLDivElement>(null);
-  const { canScrollDown, recheckScroll } = useScrollIndicator(linesScrollRef);
+  const { canScrollDown, canScrollUp, showScrollToTop, recheckScroll } = useScrollIndicator(linesScrollRef);
 
   // lines 変化時にスクロール量を再チェック（行追加でスクロール高が変わる）
   useEffect(() => {
     recheckScroll();
   }, [props.lines, recheckScroll]);
+
+  // ===== scroll-to-top-toggle (item 3) =====
+  // reduced-motion では behavior: "auto" を使う。
+  const scrollToTop = useCallback(() => {
+    const el = linesScrollRef.current;
+    if (!el) return;
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    el.scrollTo({ top: 0, behavior: reduced ? "auto" : "smooth" });
+  }, []);
 
   // aria-label で名前付き region として AT に認識させる（landmark ナビゲーション対応）。
   return (
@@ -245,6 +267,8 @@ export function ScriptEditor(props: ScriptEditorProps) {
             {/* 合計文字数: テストが /合計文字数:\s*N/ で getByText するため単一要素で保持する。
                 span 等で数値を分割しない（Why コメント: ScriptEditor.test.tsx, App.test.tsx 参照）。 */}
             <span className={styles.stat}>合計文字数: {total}文字</span>
+            {/* 行数 stat (item 1): 独立した stat 要素で表示。合計文字数と同じスタイル。 */}
+            <span className={styles.stat}>行数: {props.lines.length}</span>
           </div>
           {/* イコライザ波形 — 純粋装飾。aria-hidden で AT に読ませない。 */}
           <div className={styles.waveform} aria-hidden="true">
@@ -255,12 +279,24 @@ export function ScriptEditor(props: ScriptEditorProps) {
 
       {/* ===== Lines scroll (スクロールインジケーター コンテナ) ===== */}
       <div className={styles.linesScrollWrapper}>
+        {/* ===== 上向きスクロール促し矢印 (item 2) =====
+         * canScrollUp 時のみ表示。上部中央に配置。
+         * aria-hidden: 純粋装飾。
+         * scroll-arrow-pulse の上向き版（▲）。
+         * prefers-reduced-motion: reduce では脈動を止める（表示は残す）。
+         */}
+        {canScrollUp && (
+          <div className={styles.scrollIndicatorTop} aria-hidden="true">
+            <span className={styles.scrollArrowUp}>▲</span>
+          </div>
+        )}
+
         <div className={styles.linesScroll} ref={linesScrollRef}>
           <div className={styles.lines}>
             {props.lines.map((line, i) => (
               <LineRow
                 key={line.id}
-                // item 3: FLIP のため各行の DOM ノードを ref で収集する。
+                // FLIP のため各行の DOM ノードを ref で収集する。
                 // LineRow は memo のまま。ref は props ではなく DOM レイヤーで付与。
                 ref={getRowRef(line.id)}
                 line={line}
@@ -278,14 +314,11 @@ export function ScriptEditor(props: ScriptEditorProps) {
               />
             ))}
 
-            {/* ===== 行追加ボタン (item 2: 二重 + 修正 / item 3: FLIP 対象) =====
-             * item 2:
-             *   - aria-label="+ 行を追加"（テストのアクセシブル名を維持）
-             *   - 装飾 .plus（aria-hidden）は「+」のまま残す
-             *   - 可視テキストは「行を追加」に変更（二重 + を解消）
-             *   - 見た目: 「＋ 行を追加」（+は1つ）、アクセシブル名: "+ 行を追加"
-             * item 3:
-             *   - addRowRef で DOM ノードを収集し FLIP 対象に含める
+            {/* ===== 行追加ボタン (FLIP 対象) =====
+             * - aria-label="+ 行を追加"（テストのアクセシブル名を維持）
+             * - 装飾 .plus（aria-hidden）は「+」のまま残す
+             * - 可視テキストは「行を追加」、アクセシブル名: "+ 行を追加"
+             * - addRowRef で DOM ノードを収集し FLIP 対象に含める
              */}
             <button
               ref={addRowRef as React.Ref<HTMLButtonElement>}
@@ -300,10 +333,9 @@ export function ScriptEditor(props: ScriptEditorProps) {
           </div>
         </div>
 
-        {/* ===== スクロールインジケーター (item 7: scroll-arrow-pulse) =====
-         * canScrollDown 時のみ表示。最下部で fade-out。
+        {/* ===== 下向きスクロール促し矢印 (scroll-arrow-pulse) =====
+         * canScrollDown 時のみ表示。下部中央に配置。
          * aria-hidden: 純粋装飾。
-         * 上下に脈動する矢印（scroll-arrow-pulse: scroll-indicator.md / cygames-corporate）。
          * prefers-reduced-motion: reduce では脈動を止める（表示自体は残す）。
          */}
         {canScrollDown && (
@@ -311,6 +343,21 @@ export function ScriptEditor(props: ScriptEditorProps) {
             <span className={styles.scrollArrow}>▼</span>
           </div>
         )}
+
+        {/* ===== 一番上に戻るボタン (item 3: scroll-to-top-toggle) =====
+         * scroll-to-top-toggle (hover-feedback-family / nissan-jobs):
+         *   opacity + translateY のトグルでふわっと表示/非表示。
+         * 位置: 右下（下部中央の促し矢印と重ならないよう右寄り）。
+         * クリックで lines-scroll を最上部へスムーズスクロール（reduced-motion なら auto）。
+         * aria-label="一番上に戻る"。
+         */}
+        <button
+          className={`${styles.scrollToTop} ${showScrollToTop ? styles.scrollToTopVisible : ""}`}
+          onClick={scrollToTop}
+          aria-label="一番上に戻る"
+        >
+          ▲
+        </button>
       </div>
     </section>
   );
