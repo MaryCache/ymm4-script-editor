@@ -15,10 +15,12 @@
   height: 100vh;
 }
 
-/* ===== Ambient blob wrapper (item 6: bg-decoration-family)
- * Fixed behind all UI (z-index: 0). pointer-events: none ensures no interaction
- * (defined here in App.module.css — not inherited from global.css).
+/* ===== Ambient blob wrapper (bg-decoration-family)
+ * Fixed behind all UI (z-index: 0). pointer-events: none ensures no interaction.
  * aria-hidden is set on the JSX element; these are purely decorative.
+ *
+ * glass-fade (linear-app: kv-hero): mask-image グラデで wrapper 縁を自然に溶かす。
+ * backdrop-filter は blob 内部では不使用（パフォーマンス節約）; body 側の blur は維持。
  */
 .bgAmbient {
   position: fixed;
@@ -26,44 +28,119 @@
   pointer-events: none;
   z-index: 0;
   overflow: hidden;
+  /* glass-fade: mask-image で wrapper の縁 (上下左右) を透明に溶かし、
+   * ブロブが画面端でぶつ切りになるのを防ぐ。 */
+  mask-image:
+    radial-gradient(ellipse 95% 92% at 50% 50%, black 55%, transparent 100%);
 }
 
-/* Blob 1: cyan, top-left — float-vertical animation (bg-decoration-family)
- * Slowly drifts with translate + scale only (GPU-composited, no layout triggers).
- * 45s alternate gives a very gradual, subtle breathing feel.
+/* ===== slow-rot ring (konagi-character-sheet / bg-decoration-family)
+ * rotate 0→360deg, 80s linear infinite — 超スロー回転の大径装飾リング。
+ * 薄い cyan ボーダーリングを背面に置き、静かに回し続けることで「動作してる感」を添える。
+ * Why ::before on bgAmbient: 追加 DOM なし。z-index は bgAmbient 内に閉じている。
+ *
+ * transformOrigin は要素中心 (50% 50%) がデフォルトのため指定不要。
+ * will-change: transform で GPU コンポジット層に昇格させ、主スレッドをブロックしない。
+ */
+.bgAmbient::before {
+  content: "";
+  position: absolute;
+  /* 視野よりも大きなリングを中央配置し、回転時に角が見えないようにする */
+  width: 900px;
+  height: 900px;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 1px solid rgba(43, 180, 230, 0.055);
+  /* 内側にも細い光線を追加: box-shadow で inset リング */
+  box-shadow:
+    inset 0 0 0 60px rgba(16, 125, 200, 0.018),
+    0 0 0 1px rgba(88, 211, 240, 0.03);
+  animation: slowRot 80s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* 二重リング: 逆方向・異サイズで奥行き感 */
+.bgAmbient::after {
+  content: "";
+  position: absolute;
+  width: 1200px;
+  height: 1200px;
+  top: 50%;
+  left: 50%;
+  translate: -50% -50%;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 125, 200, 0.03);
+  animation: slowRotReverse 120s linear infinite;
+  will-change: transform;
+  pointer-events: none;
+}
+
+/* slow-rot keyframes */
+@keyframes slowRot {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(360deg); }
+}
+@keyframes slowRotReverse {
+  from { transform: rotate(0deg); }
+  to   { transform: rotate(-360deg); }
+}
+
+/* ===== Blob 1: cyan, top-left
+ * glass-fade 強化: filter: blur(52px) でバンディングを解消し、柔らかい発光にする。
+ * mask-image グラデで縁を溶かし、gradient が「くすむ/途切れる」のを防ぐ。
+ * float-vertical animation (bg-decoration-family) — translate/scale のみ (GPU composited)。
  */
 .bgBlob1 {
   display: block;
   position: absolute;
-  width: 700px;
-  height: 500px;
+  width: 800px;
+  height: 600px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(16, 125, 200, 0.13) 0%, transparent 70%);
-  top: -15%;
-  left: -10%;
+  /* 多ストップ + 低彩度スタートでバンディングを抑制 */
+  background: radial-gradient(
+    ellipse at center,
+    rgba(16, 125, 200, 0.22) 0%,
+    rgba(16, 125, 200, 0.14) 25%,
+    rgba(16, 125, 200, 0.06) 55%,
+    transparent 75%
+  );
+  /* blur でバンディング解消 + 柔らかい発光 (glass-fade 系の考え方) */
+  filter: blur(52px);
+  /* mask-image で縁を自然に溶かす */
+  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
+  top: -18%;
+  left: -12%;
   animation: blobDrift1 45s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-/* Blob 2: lighter cyan, bottom-right — float-horizontal animation (bg-decoration-family)
- * Longer 60s cycle for counterpoint rhythm against blob 1.
- */
+/* Blob 2: lighter cyan, bottom-right */
 .bgBlob2 {
   display: block;
   position: absolute;
-  width: 600px;
-  height: 450px;
+  width: 700px;
+  height: 520px;
   border-radius: 50%;
-  background: radial-gradient(ellipse at center, rgba(43, 180, 230, 0.09) 0%, transparent 70%);
-  bottom: -10%;
-  right: -8%;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(43, 180, 230, 0.16) 0%,
+    rgba(43, 180, 230, 0.09) 30%,
+    rgba(43, 180, 230, 0.03) 60%,
+    transparent 78%
+  );
+  filter: blur(60px);
+  mask-image: radial-gradient(ellipse at center, black 25%, transparent 72%);
+  bottom: -12%;
+  right: -10%;
   animation: blobDrift2 60s ease-in-out infinite alternate;
   will-change: transform;
 }
 
-/* Star-flicker dots within each blob (star-flicker from bg-decoration-family / mahoyaku-1st).
- * Tiny 2px cyan points blink at irregular intervals (5–14s range).
- * opacity kept very low so they read as faint sparkles, not distracting pixels.
+/* Star-flicker dots (star-flicker / mahoyaku-1st / bg-decoration-family).
+ * blur 適用後もドットは残すが、opacity をさらに抑えて主張しすぎないようにする。
  */
 .bgBlob1::before,
 .bgBlob1::after,
@@ -98,15 +175,74 @@
 /* star-flicker keyframe (bg-decoration-family) */
 @keyframes starFlicker {
   0%, 100% { opacity: 0.05; }
-  50%       { opacity: 0.7; }
+  50%       { opacity: 0.65; }
 }
 
-/* prefers-reduced-motion: stop infinite blob/star animations (item 6) */
+/* ===== marquee-scroll (linear-app / bg-decoration-family)
+ * CSS translateX 無限ループ (JS 不要)。
+ * 極薄の cyan モノスペース文字帯を横方向に無限スクロールさせるかっこいい背景装飾。
+ *
+ * 配置: editor 上部の薄い帯 (top: 54px でヘッダー直下、z-index: 0 で背面)。
+ * opacity: 0.028 で極薄——コンテンツの邪魔にならないことを最優先。
+ * aria-hidden は JSX 側で設定。pointer-events: none は bgAmbient に継承。
+ *
+ * テキスト帯は2本の複製を横に並べ、片方が画面外に出た瞬間に接続するループにする。
+ * transform: translateX(-50%) で 1 コピー分左にシフト → アニメーションで左へ移動。
+ */
+.marqueeTrack {
+  position: absolute;
+  top: 58px;          /* ヘッダー (52px) + 微小マージン */
+  left: 0;
+  width: max-content;
+  white-space: nowrap;
+  pointer-events: none;
+  /* 上下を mask で溶かし、帯としての存在感を抑える */
+  mask-image: linear-gradient(
+    to bottom,
+    transparent 0%,
+    black 20%,
+    black 80%,
+    transparent 100%
+  );
+}
+
+.marqueeInner {
+  display: inline-flex;
+  animation: marqueeScroll 40s linear infinite;
+  will-change: transform;
+  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 10px;
+  letter-spacing: 0.22em;
+  color: rgba(43, 180, 230, 0.85);
+  opacity: 0.028;
+  user-select: none;
+  line-height: 1.8;
+  /* 2本並べてシームレスループ: 各 .marqueeText の幅が同一なら切れ目なく続く */
+}
+
+.marqueeText {
+  /* padding で単語間のスペースを確保 */
+  padding-right: 3em;
+}
+
+/* marquee-scroll keyframe: translateX で左方向に1テキスト分(50%)移動 */
+@keyframes marqueeScroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* prefers-reduced-motion: 全演出の infinite アニメーションを停止 */
 @media (prefers-reduced-motion: reduce) {
+  /* blob drift & star */
   .bgBlob1 { animation: none; }
   .bgBlob2 { animation: none; }
   .bgBlob1::before,
   .bgBlob1::after,
   .bgBlob2::before,
   .bgBlob2::after { animation: none; }
+  /* slow-rot rings */
+  .bgAmbient::before { animation: none; }
+  .bgAmbient::after  { animation: none; }
+  /* marquee */
+  .marqueeInner { animation: none; }
 }
