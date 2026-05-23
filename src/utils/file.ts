@@ -6,8 +6,13 @@ export const downloadBlob = (blob: Blob, filename: string): void => {
   const anchor = document.createElement("a");
   anchor.href = url;
   anchor.download = filename;
+  // DOM に挿入してから click する。未挿入だと一部ブラウザで click イベントが発火しない。
+  document.body.appendChild(anchor);
   anchor.click();
-  URL.revokeObjectURL(url);
+  document.body.removeChild(anchor);
+  // 同期 revoke はダウンロード開始前に URL が無効化されうるため、
+  // マイクロタスクを1周待ってから解放する。
+  setTimeout(() => URL.revokeObjectURL(url), 0);
 };
 
 export const downloadText = (text: string, filename: string, mime: string): void => {

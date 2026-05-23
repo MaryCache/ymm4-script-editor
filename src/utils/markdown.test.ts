@@ -53,6 +53,28 @@ test("閉じない壊れたフロントマターは本文として扱い、パ�
   expect(project.lines.map((l) => l.text)).toEqual(["P", "やあ"]);
 });
 
+test("parseMarkdown は孤立 \\r（旧 Mac 改行）を \\n として扱う", () => {
+  // \r だけで区切られた行も正しく分割・パースされる
+  const { project } = parseMarkdown("霊夢: やあ\r魔理沙: どうも");
+  expect(project.lines.map((l) => l.text)).toEqual(["やあ", "どうも"]);
+});
+
+test("buildMarkdown の projectName に改行が含まれてもフロントマターが壊れない", () => {
+  const original: Project = {
+    version: 1,
+    projectName: "タイトル\n第2行",
+    characters: [{ id: "c1", name: "霊夢", color: "#FF6B6B" }],
+    lines: [{ id: "l1", characterId: "c1", text: "やあ" }],
+  };
+  const md = buildMarkdown(original);
+  // 閉じ --- がただ1つ存在し、フロントマターが壊れていないこと
+  const fmMatch = md.match(/^---\n([\s\S]*?)\n---\n/);
+  expect(fmMatch).not.toBeNull();
+  // round-trip でプロジェクト名が1行に収まっている（改行はスペースに置換）
+  const { project: restored } = parseMarkdown(md);
+  expect(restored.projectName).toBe("タイトル 第2行");
+});
+
 test("buildMarkdown は完全形式で round-trip できる（色は保持）", () => {
   const original: Project = {
     version: 1, projectName: "P",

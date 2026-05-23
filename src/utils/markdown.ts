@@ -32,7 +32,8 @@ const parseFrontmatter = (block: string): Frontmatter => {
 };
 
 export const parseMarkdown = (raw: string): ParseResult => {
-  let body = raw.replace(/\r\n/g, "\n");
+  // 孤立した \r（旧 Mac 改行）も \n に統一する。
+  let body = raw.replace(/\r\n|\r/g, "\n");
   let fm: Frontmatter = { characters: [] };
 
   const fmMatch = body.match(/^---\n([\s\S]*?)\n---\n?/);
@@ -80,12 +81,18 @@ export const parseMarkdown = (raw: string): ParseResult => {
   };
 };
 
+// フロントマターに改行が混入すると --- の区切りが崩れて round-trip が壊れるため、
+// projectName とキャラ名の改行（\r\n / \r / \n）を半角スペースに置換してから埋め込む。
+const sanitizeLine = (s: string): string => s.replace(/\r\n|\r|\n/g, " ");
+
 export const buildMarkdown = (project: Project): string => {
   const head = [
     "---",
-    `project: ${project.projectName}`,
+    `project: ${sanitizeLine(project.projectName)}`,
     "characters:",
-    ...project.characters.map((c) => [`  - name: ${c.name}`, `    color: "${c.color}"`].join("\n")),
+    ...project.characters.map((c) =>
+      [`  - name: ${sanitizeLine(c.name)}`, `    color: "${c.color}"`].join("\n")
+    ),
     "---",
     "",
   ].join("\n");
