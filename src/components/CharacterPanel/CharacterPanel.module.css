@@ -7,4 +7,7 @@
 .item { display: flex; align-items: center; gap: 8px; }
 .chip { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
 .name { flex: 1; }
-.item button { padding: 2px 8px; }
+/* タグ依存セレクタをやめ、専用クラスで削除ボタンをスタイリングする。
+   --color-danger で破壊操作の視覚的アフォーダンスを提供する。 */
+.deleteButton { padding: 2px 8px; }
+.deleteButton:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }

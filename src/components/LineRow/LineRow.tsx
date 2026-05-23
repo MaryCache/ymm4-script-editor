@@ -15,6 +15,7 @@ export type LineRowProps = {
   onMoveDown: (lineId: string) => void;
   onAddAfter: (lineId: string) => void;
   onDelete: (lineId: string) => void;
+  /** 親（App）は useCallback で安定化して渡すこと — memo を効かせるため（NF-10）。 */
   onCopy: (line: Line) => void;
 };
 
@@ -51,7 +52,8 @@ export const LineRow = memo(function LineRow(props: LineRowProps) {
         <button aria-label="下に移動" disabled={isLast} onClick={() => props.onMoveDown(line.id)}>↓</button>
         <button aria-label="この行をコピー" onClick={() => props.onCopy(line)}>⧉</button>
         <button aria-label="直後に行を追加" onClick={() => props.onAddAfter(line.id)}>＋</button>
-        <button aria-label="この行を削除" onClick={() => props.onDelete(line.id)}>✕</button>
+        {/* deleteButton クラスで --color-danger を当て、破壊操作の視覚的アフォーダンスにする。 */}
+        <button className={styles.deleteButton} aria-label="この行を削除" onClick={() => props.onDelete(line.id)}>✕</button>
       </div>
     </div>
   );

@@ -6,3 +6,5 @@
 .count { width: 3em; text-align: right; color: var(--color-text-sub); font-variant-numeric: tabular-nums; }
 .actions { display: flex; gap: 2px; }
 .actions button { padding: 4px 8px; }
+/* --color-danger で削除ボタンに破壊操作の視覚的アフォーダンスを提供する。 */
+.deleteButton:hover:not(:disabled) { border-color: var(--color-danger); color: var(--color-danger); }

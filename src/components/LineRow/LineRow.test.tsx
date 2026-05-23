@@ -41,3 +41,25 @@ test("コピーボタンで onCopy が呼ばれる", async () => {
   await userEvent.click(screen.getByRole("button", { name: "この行をコピー" }));
   expect(onCopy).toHaveBeenCalledWith(line);
 });
+
+// m-5: isLast=true で下移動ボタンが disabled
+test("isLast なら下移動ボタンが disabled", () => {
+  render(<LineRow {...baseProps} isLast={true} />);
+  expect(screen.getByRole("button", { name: "下に移動" })).toBeDisabled();
+});
+
+// m-5: 削除ボタンで onDelete が line.id 付きで呼ばれる
+test("削除ボタンで onDelete が line.id 付きで呼ばれる", async () => {
+  const onDelete = vi.fn();
+  render(<LineRow {...baseProps} onDelete={onDelete} />);
+  await userEvent.click(screen.getByRole("button", { name: "この行を削除" }));
+  expect(onDelete).toHaveBeenCalledWith(line.id);
+});
+
+// m-5: 行追加ボタンで onAddAfter が line.id 付きで呼ばれる
+test("直後に行を追加ボタンで onAddAfter が line.id 付きで呼ばれる", async () => {
+  const onAddAfter = vi.fn();
+  render(<LineRow {...baseProps} onAddAfter={onAddAfter} />);
+  await userEvent.click(screen.getByRole("button", { name: "直後に行を追加" }));
+  expect(onAddAfter).toHaveBeenCalledWith(line.id);
+});

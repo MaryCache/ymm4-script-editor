@@ -17,7 +17,8 @@ test("一覧にキャラ名を表示", () => {
 test("名前を入力して追加すると onAdd が呼ばれ、入力がクリアされる", async () => {
   const onAdd = vi.fn();
   render(<CharacterPanel characters={[]} onAdd={onAdd} onDelete={() => {}} />);
-  const input = screen.getByPlaceholderText("キャラクター名");
+  // aria-label="キャラクター名" で取得（I-4 対応）
+  const input = screen.getByRole("textbox", { name: "キャラクター名" });
   await userEvent.type(input, "魔理沙");
   await userEvent.click(screen.getByRole("button", { name: "追加" }));
   expect(onAdd).toHaveBeenCalledWith("魔理沙");
@@ -27,7 +28,8 @@ test("名前を入力して追加すると onAdd が呼ばれ、入力がクリ�
 test("空白のみの名前は追加できない", async () => {
   const onAdd = vi.fn();
   render(<CharacterPanel characters={[]} onAdd={onAdd} onDelete={() => {}} />);
-  await userEvent.type(screen.getByPlaceholderText("キャラクター名"), "   ");
+  // aria-label="キャラクター名" で取得（I-4 対応）
+  await userEvent.type(screen.getByRole("textbox", { name: "キャラクター名" }), "   ");
   await userEvent.click(screen.getByRole("button", { name: "追加" }));
   expect(onAdd).not.toHaveBeenCalled();
 });

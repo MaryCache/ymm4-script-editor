@@ -21,8 +21,9 @@ export function ScriptEditor(props: ScriptEditorProps) {
   // キャラが0人のとき行追加を無効化（選択肢がないため。ScriptEditor 側でも UI 制約を明示）。
   const canAdd = props.characters.length > 0;
 
+  // aria-label で名前付き region として AT に認識させる（landmark ナビゲーション対応）。
   return (
-    <section className={styles.editor}>
+    <section className={styles.editor} aria-label="台本エディター">
       <div className={styles.bar}>合計文字数: {total}文字</div>
       <div className={styles.list}>
         {props.lines.map((line, i) => (

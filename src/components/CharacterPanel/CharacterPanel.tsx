@@ -25,7 +25,9 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
     <aside className={styles.panel}>
       <h2 className={styles.title}>キャラクター</h2>
       <form className={styles.form} onSubmit={(e) => { e.preventDefault(); submit(); }}>
+        {/* aria-label でスクリーンリーダーと getByRole テストから取得可能にする（placeholder は視覚的ヒントとして残す）。 */}
         <input
+          aria-label="キャラクター名"
           placeholder="キャラクター名"
           value={name}
           onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
@@ -37,7 +39,13 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
           <li key={c.id} className={styles.item}>
             <span className={styles.chip} style={{ background: c.color }} />
             <span className={styles.name}>{c.name}</span>
-            <button aria-label={`${c.name} を削除`} disabled={!canDelete} onClick={() => onDelete(c.id)}>✕</button>
+            {/* deleteButton クラスで破壊操作の視覚的アフォーダンス（--color-danger）を提供する。 */}
+            <button
+              className={styles.deleteButton}
+              aria-label={`${c.name} を削除`}
+              disabled={!canDelete}
+              onClick={() => onDelete(c.id)}
+            >✕</button>
           </li>
         ))}
       </ul>

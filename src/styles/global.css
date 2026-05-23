@@ -38,4 +38,11 @@ input, select {
   border: 1px solid var(--color-border);
   border-radius: 6px; padding: 6px 10px;
 }
-input:focus, select:focus { outline: none; border-color: var(--color-accent); }
+/* :focus-visible でキーボード操作時のみアウトラインを出す。
+   outline:none は強制カラーモード（Windows 高コントラスト等）でフォーカスが完全に不可視になるため使わない。
+   border-color の変化はマウス操作でも見えるので :focus のまま維持してよい。 */
+input:focus, select:focus { border-color: var(--color-accent); }
+input:focus-visible, select:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
+
+/* キーボード操作時にボタン・summary のフォーカスも必ず可視にする（強制カラーモード対策も兼ねる）。 */
+button:focus-visible { outline: 2px solid var(--color-accent); outline-offset: 1px; }
