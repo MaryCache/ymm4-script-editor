@@ -35,6 +35,16 @@ export type ScriptEditorProps = {
 
 const FLIP_DURATION = 220; // ms — CSS transition と合わせる
 
+// 進行中の FLIP アニメーションの状態。
+// rafId: requestAnimationFrame の ID（キャンセル用）。
+// timeoutId: setTimeout の ID（クリーンアップ用）。
+// els: アニメーション中の要素とその元 transition 値。
+type PendingFLIP = {
+  rafId: number;
+  timeoutId: ReturnType<typeof window.setTimeout>;
+  els: Array<{ el: HTMLElement; prevTransition: string }>;
+};
+
 // signature: 行の順序＋件数を表す文字列。これが変わった時だけ FLIP を実行する。
 // Why: セリフ入力欄は単一行で行高が固定 → テキスト打鍵では行は移動しない。
 // 毎レンダーで全行の getBoundingClientRect を呼ぶと 500 行で layout thrashing になり
@@ -46,15 +56,29 @@ function useFLIP(signature: string) {
   const addRowRef = useRef<HTMLElement | null>(null);
   // prevRects: 前回レンダー時の rect（First フェーズで記録）
   const prevRects = useRef<Map<string, DOMRect>>(new Map());
+  // pending: 進行中の FLIP アニメーション状態（再入防止ガード用）。
+  // Why useRef: レンダーをトリガーせず、useLayoutEffect の外から参照できる必要がある。
+  const pending = useRef<PendingFLIP | null>(null);
 
   // getRef: LineRow に渡す ref callback factory。
   // Why callback ref (not useRef): key が変わるたびに古い DOM ノードを cleanup できる。
-  const getRowRef = useCallback((id: string): RefCallback<HTMLElement> => (el) => {
-    if (el) {
-      rowRefs.current.set(id, el);
-    } else {
-      rowRefs.current.delete(id);
-    }
+  // Why cbCache (I-2): getRowRef をインライン呼び出しすると毎レンダーで全行のコールバック参照が
+  // 変わり、React が全行の ref を null→el で再登録する（500行で打鍵ごと 1000回の Map 操作）。
+  // id 別にキャッシュして同一参照を返すことで、打鍵時の ref 再登録を防ぐ。
+  const cbCache = useRef<Map<string, RefCallback<HTMLElement>>>(new Map());
+  const getRowRef = useCallback((id: string): RefCallback<HTMLElement> => {
+    const cached = cbCache.current.get(id);
+    if (cached) return cached;
+    const cb: RefCallback<HTMLElement> = (el) => {
+      if (el) {
+        rowRefs.current.set(id, el);
+      } else {
+        rowRefs.current.delete(id);
+        cbCache.current.delete(id);
+      }
+    };
+    cbCache.current.set(id, cb);
+    return cb;
   }, []);
 
   // === First フェーズ: レンダー前（useLayoutEffect の前）に前回 rect を記録 ===
@@ -63,6 +87,30 @@ function useFLIP(signature: string) {
   // → useLayoutEffect 内で (Last → Invert → Play → 保存) の順で実行。
 
   useLayoutEffect(() => {
+    // === 再入防止ガード（I-1）===
+    // 素早い連打で前回の RAF/timeout が未完のまま次の useLayoutEffect が走ると、
+    // Last の getBoundingClientRect がアニメーション中の座標を拾い差分が壊れる。
+    // 冒頭で pending があれば即キャンセルし、対象要素を「確定位置」に戻してから測定する。
+    if (pending.current) {
+      const { rafId, timeoutId, els } = pending.current;
+      cancelAnimationFrame(rafId);
+      clearTimeout(timeoutId);
+      // transition を無効にして transform を即時リセット → 確定位置に戻す。
+      // prevTransition は layout flush 後に復元するため、ここでは変更だけ行う。
+      for (const entry of els) {
+        entry.el.style.transition = "none";
+        entry.el.style.transform = "";
+      }
+      // 上記の style 変更を確定させるために getBoundingClientRect を呼ぶ（強制 layout flush）。
+      // これにより以降の測定は確定位置（アニメーション前の座標）を返す。
+      rowRefs.current.forEach((el) => { el.getBoundingClientRect(); });
+      // transition を元の値に戻す
+      for (const entry of els) {
+        entry.el.style.transition = entry.prevTransition;
+      }
+      pending.current = null;
+    }
+
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     if (reduced) {
       // reduced モードでは rect 記録だけ行い FLIP はスキップ
@@ -108,19 +156,24 @@ function useFLIP(signature: string) {
     // === Play フェーズ: 次フレームで transform をリセット（transition が発火）===
     if (animated.length > 0) {
       // requestAnimationFrame で「Invert の paint が完了した次フレーム」を狙う。
-      requestAnimationFrame(() => {
+      const rafId = requestAnimationFrame(() => {
         for (const { el, prevTransition } of animated) {
           el.style.transition = `transform ${FLIP_DURATION}ms var(--ease-out), ${prevTransition || ""}`.trim().replace(/,\s*$/, "");
           el.style.transform = "";
         }
         // アニメーション完了後に transition をクリーンアップ
-        window.setTimeout(() => {
+        const timeoutId = window.setTimeout(() => {
           for (const { el, prevTransition } of animated) {
             el.style.transition = prevTransition;
             el.style.transform = "";
           }
+          pending.current = null;
         }, FLIP_DURATION + 16);
+        // RAF コールバック内で timeoutId が確定するため pending を更新する
+        if (pending.current) pending.current.timeoutId = timeoutId;
       });
+      // pending に記録しておく（次の useLayoutEffect 冒頭でキャンセル可能にする）
+      pending.current = { rafId, timeoutId: -1 as unknown as ReturnType<typeof window.setTimeout>, els: animated };
     }
 
     // === 次回 First 用に現在の rect を保存 ===

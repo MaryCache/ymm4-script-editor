@@ -16,7 +16,8 @@
 }
 
 /* ===== Ambient blob wrapper (item 6: bg-decoration-family)
- * Fixed behind all UI (z-index: 0). pointer-events: none ensures no interaction.
+ * Fixed behind all UI (z-index: 0). pointer-events: none ensures no interaction
+ * (defined here in App.module.css — not inherited from global.css).
  * aria-hidden is set on the JSX element; these are purely decorative.
  */
 .bgAmbient {

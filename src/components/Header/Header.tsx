@@ -5,7 +5,7 @@ import {
   useCallback,
   useEffect,
   type ChangeEvent,
-  type KeyboardEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
   type MouseEvent,
 } from "react";
 import styles from "./Header.module.css";
@@ -70,8 +70,10 @@ export function Header(props: HeaderProps) {
   // メニュー外クリックで閉じる（item 5）
   useOutsideClick(headerRef, closeMenu, openMenu !== null);
 
-  // Escape キーで閉じる（keyboard a11y）
-  const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+  // Escape キーで閉じる（keyboard a11y）。
+  // M-1: onKeyDown を .headerActions ではなく <header> に移すことで、
+  // プロジェクト名入力にフォーカスがあっても Escape でメニューを閉じられる。
+  const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLElement>) => {
     if (e.key === "Escape") closeMenu();
   }, [closeMenu]);
 
@@ -92,6 +94,21 @@ export function Header(props: HeaderProps) {
     action();
     setOpenMenu(null);
   }, []);
+
+  // ===== メニューパネル ref（I-4: フォーカス管理用）=====
+  const saveMenuPanelRef = useRef<HTMLDivElement>(null);
+  const loadMenuPanelRef = useRef<HTMLDivElement>(null);
+
+  // I-4: openMenu が変化した時に、開いたパネル内の先頭 menuitem にフォーカスを移す。
+  // Why: role="menu" はキーボードユーザーが直接 menuitem を操作できるようにするための
+  // ARIA パターン。メニューを開いたタイミングで先頭 item にフォーカスがないと、
+  // Tab/矢印キーで項目に到達するまでの手順が増えてアクセシビリティが低下する。
+  useEffect(() => {
+    const panelRef = openMenu === "save" ? saveMenuPanelRef : openMenu === "load" ? loadMenuPanelRef : null;
+    if (!panelRef?.current) return;
+    const firstItem = panelRef.current.querySelector<HTMLButtonElement>("button[role=\"menuitem\"]");
+    firstItem?.focus();
+  }, [openMenu]);
 
   // ===== Hidden file inputs =====
   const ymscriptInputRef = useRef<HTMLInputElement>(null);
@@ -126,7 +143,9 @@ export function Header(props: HeaderProps) {
   }, [onLoadMarkdown]);
 
   return (
-    <header className={styles.header} ref={headerRef}>
+    // M-1: onKeyDown を header ルートに置くことで、プロジェクト名入力にフォーカスがある状態でも
+    // Escape キーでメニューを閉じられる（.headerActions 内だけだと input は対象外になる）。
+    <header className={styles.header} ref={headerRef} onKeyDown={handleKeyDown}>
       {/* ===== Left: brand mark + project name ===== */}
       <div className={styles.brand}>
         {/* aria-hidden: 純粋な装飾ロゴ。スクリーンリーダーに読ませない。 */}
@@ -143,8 +162,7 @@ export function Header(props: HeaderProps) {
       <div className={styles.spacer} />
 
       {/* ===== Right: action buttons ===== */}
-      {/* onKeyDown で Escape を捕捉してメニューを閉じる（a11y keyboard navigation） */}
-      <div className={styles.headerActions} onKeyDown={handleKeyDown}>
+      <div className={styles.headerActions}>
         {/* 全件コピー: primary variant で最重要 CTA として強調 */}
         <button className={styles.btnPrimary} onClick={onCopyAll}>全件コピー</button>
 
@@ -168,7 +186,8 @@ export function Header(props: HeaderProps) {
             保存▼
           </button>
           {openMenu === "save" && (
-            <div className={styles.menuPanel} role="menu">
+            // I-3: aria-label でアクセシブル名を付与（role="menu" 単独では名前がなく AT が識別できない）
+            <div className={styles.menuPanel} role="menu" aria-label="保存メニュー" ref={saveMenuPanelRef}>
               <button
                 role="menuitem"
                 className={styles.menuItem}
@@ -208,7 +227,8 @@ export function Header(props: HeaderProps) {
             読込▼
           </button>
           {openMenu === "load" && (
-            <div className={styles.menuPanel} role="menu">
+            // I-3: aria-label でアクセシブル名を付与（role="menu" 単独では名前がなく AT が識別できない）
+            <div className={styles.menuPanel} role="menu" aria-label="読込メニュー" ref={loadMenuPanelRef}>
               <button
                 role="menuitem"
                 className={styles.menuItem}

@@ -18,11 +18,13 @@ if (typeof globalThis.ResizeObserver === "undefined") {
 // テスト環境では prefers-reduced-motion: reduce = true として扱う。
 // Why reduce=true in tests: アニメーション（setTimeout 付き削除）を即時実行させ、
 // テストのタイマーモック不要にする。視覚アニメーションのロジックはブラウザ環境で確認する。
+// M-4: includes() → 完全一致に変更。"(prefers-reduced-motion: no-preference)" が
+// includes("prefers-reduced-motion") で true になり、誤って reduce 扱いされるのを防ぐ。
 if (typeof window.matchMedia === "undefined") {
   Object.defineProperty(window, "matchMedia", {
     writable: true,
     value: (query: string) => ({
-      matches: query.includes("prefers-reduced-motion"),
+      matches: query === "(prefers-reduced-motion: reduce)",
       media: query,
       onchange: null,
       addListener: () => {},
