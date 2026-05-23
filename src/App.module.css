@@ -1,0 +1,3 @@
+/* App レイアウト: Header を固定ヘッダとして上に置き、body で残高を埋める 2カラム構成 */
+.app { display: flex; flex-direction: column; height: 100%; }
+.body { display: flex; flex: 1; min-height: 0; }
