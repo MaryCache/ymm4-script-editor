@@ -195,6 +195,8 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
   const [canScrollUp, setCanScrollUp] = useState(false);
   const [showScrollToTop, setShowScrollToTop] = useState(false);
 
+  // check: linesRef は useRef 由来で参照が不変。
+  // useCallback の deps から外すことで「この関数は linesRef を追いかけない（不変前提）」と明示する。
   const check = useCallback(() => {
     const el = linesRef.current;
     if (!el) {
@@ -209,7 +211,8 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
     setCanScrollUp(scrollTop > 8);
     // scroll-to-top-toggle: scrollTop が clientHeight を超えたら表示
     setShowScrollToTop(scrollTop > (clientHeight || 8));
-  }, [linesRef]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []); // linesRef は useRef 由来で不変 — deps に含めない
 
   useEffect(() => {
     const el = linesRef.current;
@@ -222,7 +225,7 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
       el.removeEventListener("scroll", check);
       ro.disconnect();
     };
-  }, [linesRef, check]);
+  }, [linesRef, check]); // linesRef は useRef 由来で不変だが、useEffect 内で直接参照するため lint に含める
 
   // lines 変化時も再チェック（行追加/削除でスクロール高が変わるため）
   return { canScrollDown, canScrollUp, showScrollToTop, recheckScroll: check };
@@ -350,11 +353,17 @@ export function ScriptEditor(props: ScriptEditorProps) {
          * 位置: 右下（下部中央の促し矢印と重ならないよう右寄り）。
          * クリックで lines-scroll を最上部へスムーズスクロール（reduced-motion なら auto）。
          * aria-label="一番上に戻る"。
+         *
+         * a11y: 非表示時は tabIndex={-1} + aria-hidden="true" でフォーカス/SR 読み上げを防ぐ。
+         *   Why 属性切替（条件付きレンダーでない）: フェードアニメ（scroll-to-top-toggle）を維持するため。
+         *   opacity:0 + pointer-events:none だけでは DOM 上のフォーカス/SR 読み上げを防げない。
          */}
         <button
           className={`${styles.scrollToTop} ${showScrollToTop ? styles.scrollToTopVisible : ""}`}
           onClick={scrollToTop}
           aria-label="一番上に戻る"
+          tabIndex={showScrollToTop ? undefined : -1}
+          aria-hidden={showScrollToTop ? undefined : true}
         >
           ▲
         </button>

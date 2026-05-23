@@ -30,9 +30,11 @@ export type LineRowProps = {
 // ===== 独自キャラクタードロップダウン (item 4) =====
 // アクセシブルな listbox パターン。
 // - トグル: button[aria-haspopup="listbox"][aria-expanded]
-// - ポップアップ: role="listbox" aria-label="キャラクター選択"
-// - 各項目: role="option" aria-selected
-// - キーボード: Enter/Space 開閉、↑↓ 移動、Enter 確定、Escape 閉じる
+// - ポップアップ: ul[role="listbox"] aria-label="キャラクター選択"
+//   Why ul/li: div[role=option] より ul[role=listbox]+li[role=option] の方が
+//   AT（支援技術）との相互運用性が高い（ARIA in HTML 勧告に基づく）。
+// - 各項目: li[role="option"] aria-selected
+// - キーボード: Enter/Space 開閉、↑↓ 移動、Enter 確定、Escape 閉じる、Tab は自然な移動
 // - open 状態は LineRow 内 local state（NF-10: 他行に波及しない）
 // - 外側クリックで閉じる（useOutsideClick 相当、標準 blur で対応）
 
@@ -49,7 +51,7 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
   // focusedIndex: ↑↓ キーで移動するフォーカス位置（-1 は未フォーカス）
   const [focusedIndex, setFocusedIndex] = useState(-1);
   const toggleRef = useRef<HTMLButtonElement>(null);
-  const listRef = useRef<HTMLDivElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
 
   const selectedChar = characters.find((c) => c.id === characterId);
   const selectedColor = selectedChar?.color ?? "transparent";
@@ -124,8 +126,12 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
       e.preventDefault();
       const char = characters[idx];
       if (char) selectChar(char.id);
-    } else if (e.key === "Escape" || e.key === "Tab") {
+    } else if (e.key === "Escape") {
       e.preventDefault();
+      closeDropdown();
+    } else if (e.key === "Tab") {
+      // Tab はキーボードトラップを避けるため preventDefault しない（WCAG 2.1.2）。
+      // フォーカスは自然に次要素へ移動し、ドロップダウンだけ閉じる。
       closeDropdown();
     }
   };
@@ -156,16 +162,16 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
         <span className={`${styles.charChevron} ${open ? styles.charChevronOpen : ""}`} aria-hidden="true">▼</span>
       </button>
 
-      {/* ポップアップリスト */}
+      {/* ポップアップリスト: ul/li で AT 相互運用性を確保（ARIA in HTML 勧告準拠） */}
       {open && (
-        <div
+        <ul
           ref={listRef}
           role="listbox"
           aria-label="キャラクター選択"
           className={styles.charListbox}
         >
           {characters.map((c, idx) => (
-            <div
+            <li
               key={c.id}
               role="option"
               aria-selected={c.id === characterId}
@@ -180,9 +186,9 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
                 aria-hidden="true"
               />
               <span>{c.name}</span>
-            </div>
+            </li>
           ))}
-        </div>
+        </ul>
       )}
     </div>
   );

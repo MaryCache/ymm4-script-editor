@@ -192,6 +192,7 @@
 /* ===== ポップアップリスト (item 4: listbox) =====
  * position: absolute で wrapper 直下に表示。
  * z-index: 200 で全 UI より前面（行ボタン群より高く）。
+ * ul 要素（AT 相互運用のため）: list-style / margin / padding をリセット。
  */
 .charListbox {
   position: absolute;
@@ -208,6 +209,9 @@
   flex-direction: column;
   gap: 1px;
   animation: charListboxEnter 0.18s ease both;
+  /* ul デフォルトスタイルのリセット */
+  list-style: none;
+  margin: 0;
 }
 
 @keyframes charListboxEnter {
