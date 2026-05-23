@@ -1,4 +1,4 @@
-import { parseProjectFile } from "./file";
+import { parseProjectFile, sanitizeFilename } from "./file";
 import type { Project } from "../types";
 
 const valid: Project = {
@@ -26,4 +26,29 @@ test("lines 要素に必須フィールド欠落で例外", () => {
 test("null / 文字列など非オブジェクトで例外", () => {
   expect(() => parseProjectFile(null)).toThrow();
   expect(() => parseProjectFile("nope")).toThrow();
+});
+
+// I-5: sanitizeFilename
+test("sanitizeFilename: 通常の名前はそのまま返す", () => {
+  expect(sanitizeFilename("台本タイトル")).toBe("台本タイトル");
+});
+
+test("sanitizeFilename: パス区切り文字はアンダースコアに置換する", () => {
+  expect(sanitizeFilename("a/b\\c")).toBe("a_b_c");
+});
+
+test("sanitizeFilename: Windows 禁止文字はアンダースコアに置換する", () => {
+  expect(sanitizeFilename('a:b*c?d"e<f>g|h')).toBe("a_b_c_d_e_f_g_h");
+});
+
+test("sanitizeFilename: 空文字列は untitled にフォールバックする", () => {
+  expect(sanitizeFilename("")).toBe("untitled");
+});
+
+test("sanitizeFilename: 空白のみは untitled にフォールバックする", () => {
+  expect(sanitizeFilename("   ")).toBe("untitled");
+});
+
+test("sanitizeFilename: 前後の空白はトリムする", () => {
+  expect(sanitizeFilename("  タイトル  ")).toBe("タイトル");
 });

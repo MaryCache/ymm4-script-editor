@@ -106,3 +106,82 @@ test("exportCSVToClipboard は全件 CSV をクリップボードへ書く", asy
   await act(async () => { await result.current.exportCSVToClipboard(); });
   expect(writeText).toHaveBeenCalledWith("霊夢,やあ");
 });
+
+// I-4: JSON として妥当だが version が不正なファイルは reject し、状態を変えない
+test("version:2 の .ymscript は loadFromFile が reject し状態は変わらない（構造不正の異常系）", async () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("元の名前"));
+  const badFile = new File(
+    [JSON.stringify({ version: 2, projectName: "X", characters: [], lines: [] })],
+    "future.ymscript",
+    { type: "application/json" },
+  );
+  await expect(act(async () => { await result.current.loadFromFile(badFile); })).rejects.toThrow();
+  expect(result.current.project.projectName).toBe("元の名前");
+});
+
+// I-2: addLineAfter は元の行のキャラクターを引き継ぐ
+test("addLineAfter は直前行のキャラクターを引き継ぐ", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("魔理沙"));
+  act(() => result.current.addLineAtEnd());
+  // 先頭行を2番目キャラ（魔理沙）に変更
+  const marisa = result.current.project.characters[1]!;
+  const firstLineId = result.current.project.lines[0]!.id;
+  act(() => result.current.updateLineCharacter(firstLineId, marisa.id));
+  // 魔理沙の行の直後に追加 → 新規行も魔理沙のはず
+  act(() => result.current.addLineAfter(firstLineId));
+  expect(result.current.project.lines[1]!.characterId).toBe(marisa.id);
+});
+
+// M-3: フロントマターあり Markdown を importMarkdown できる
+test("フロントマターあり Markdown を importMarkdown で読み込める", async () => {
+  const { result } = renderHook(() => useProject());
+  const md = new File(
+    ["---\ntitle: テスト台本\n---\n霊夢: こんにちは\n魔理沙: どうも"],
+    "with-frontmatter.md",
+    { type: "text/markdown" },
+  );
+  let skipped = -1;
+  await act(async () => { skipped = await result.current.importMarkdown(md); });
+  // フロントマターは行としてスキップされる
+  expect(result.current.project.lines.length).toBeGreaterThan(0);
+  expect(typeof skipped).toBe("number");
+});
+
+// M-4: moveLine の up 方向
+test("moveLine up は行を1つ上に移動する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "A"));
+  act(() => result.current.updateLineText(result.current.project.lines[1]!.id, "B"));
+  act(() => result.current.moveLine(result.current.project.lines[1]!.id, "up"));
+  expect(result.current.project.lines.map((l) => l.text)).toEqual(["B", "A"]);
+});
+
+// M-4: 先頭行の up は no-op
+test("moveLine up は先頭行に対して no-op", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "A"));
+  act(() => result.current.updateLineText(result.current.project.lines[1]!.id, "B"));
+  act(() => result.current.moveLine(result.current.project.lines[0]!.id, "up"));
+  expect(result.current.project.lines.map((l) => l.text)).toEqual(["A", "B"]);
+});
+
+// M-4: 末尾行の down は no-op
+test("moveLine down は末尾行に対して no-op", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "A"));
+  act(() => result.current.updateLineText(result.current.project.lines[1]!.id, "B"));
+  act(() => result.current.moveLine(result.current.project.lines[1]!.id, "down"));
+  expect(result.current.project.lines.map((l) => l.text)).toEqual(["A", "B"]);
+});

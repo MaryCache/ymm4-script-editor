@@ -5,7 +5,7 @@ import { generateId } from "../utils/id";
 import { colorForIndex } from "../utils/color";
 import { buildCSV, buildCSVText } from "../utils/csv";
 import { buildMarkdown, parseMarkdown } from "../utils/markdown";
-import { downloadText, parseProjectFile, readFileAsText } from "../utils/file";
+import { downloadText, parseProjectFile, readFileAsText, sanitizeFilename } from "../utils/file";
 
 export const STORAGE_KEY = "ymm4-script-editor:last-project";
 
@@ -28,11 +28,12 @@ export type UseProjectReturn = {
   exportCSVToClipboard: () => Promise<void>;        // 全件コピー（F-51）
 };
 
+// 関数にする理由: 毎回新しいオブジェクトを返し、複数の呼び出し元が参照を共有しないようにするため。
 const defaultProject = (): Project => ({ version: 1, projectName: "新規プロジェクト", characters: [], lines: [] });
 
 // localStorage から復元を試みる。壊れた値は握り潰して defaultProject にフォールバック。
 // parseProjectFile が version チェックや構造検証を行うため、部分破損も安全に扱える。
-const loadInitial = (): Project => {
+const restoreProjectFromStorage = (): Project => {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
     if (!raw) return defaultProject();
@@ -45,10 +46,10 @@ const loadInitial = (): Project => {
 const newLine = (characterId: string): Line => ({ id: generateId(), characterId, text: "" });
 
 export const useProject = (): UseProjectReturn => {
-  const [project, setProject] = useState<Project>(loadInitial);
+  const [project, setProject] = useState<Project>(restoreProjectFromStorage);
 
   // project が変わるたびに localStorage へ永続化する。
-  // useState の初期化関数 loadInitial が復元を担うので、保存と復元のループは起きない。
+  // useState の初期化関数 restoreProjectFromStorage が復元を担うので、保存と復元のループは起きない。
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
@@ -84,6 +85,7 @@ export const useProject = (): UseProjectReturn => {
       };
     }), []);
 
+  // 文脈がないため先頭キャラを割り当てる。
   const addLineAtEnd = useCallback(() =>
     setProject((p) => {
       const first = p.characters[0];
@@ -91,15 +93,22 @@ export const useProject = (): UseProjectReturn => {
       return { ...p, lines: [...p.lines, newLine(first.id)] };
     }), []);
 
-  // addLineAfter: splice はローカルコピーに対してのみ使用。元の p.lines は変更しない（イミュータブル）。
+  // 直後に追加する行は元の行のキャラを引き継ぐ（同一話者の連続入力が自然なため）。
+  // 末尾追加 addLineAtEnd は文脈がないので先頭キャラを使う。
+  // afterId の行が見つからない・登録キャラがいない場合のフォールバックは先頭キャラ。
+  // splice はローカルコピーに対してのみ使用。元の p.lines は変更しない（イミュータブル）。
   const addLineAfter = useCallback((afterId: string) =>
     setProject((p) => {
       const first = p.characters[0];
-      if (!first) return p;
+      if (!first) return p; // キャラ未登録なら no-op
       const idx = p.lines.findIndex((l) => l.id === afterId);
       if (idx === -1) return p;
+      const sourceLine = p.lines[idx];
+      const inheritedCharId = p.characters.some((c) => c.id === sourceLine?.characterId)
+        ? (sourceLine?.characterId ?? first.id)
+        : first.id;
       const next = [...p.lines];
-      next.splice(idx + 1, 0, newLine(first.id));
+      next.splice(idx + 1, 0, newLine(inheritedCharId));
       return { ...p, lines: next };
     }), []);
 
@@ -112,7 +121,6 @@ export const useProject = (): UseProjectReturn => {
   const updateLineText = useCallback((lineId: string, text: string) =>
     setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, text } : l)) })), []);
 
-  // moveLine: splice はローカルコピーに対してのみ使用。swap はデストラクチャリング代入で行う。
   const moveLine = useCallback((id: string, direction: "up" | "down") =>
     setProject((p) => {
       const idx = p.lines.findIndex((l) => l.id === id);
@@ -120,32 +128,42 @@ export const useProject = (): UseProjectReturn => {
       const target = direction === "up" ? idx - 1 : idx + 1;
       if (target < 0 || target >= p.lines.length) return p;
       const next = [...p.lines];
-      [next[idx], next[target]] = [next[target]!, next[idx]!];
+      // 範囲チェック済みのためどちらも必ず存在する。一時変数で swap を明示する。
+      const lineAtIdx = next[idx]!;
+      const lineAtTarget = next[target]!;
+      next[idx] = lineAtTarget;
+      next[target] = lineAtIdx;
       return { ...p, lines: next };
     }), []);
 
-  // --- project を読む操作は [project] 依存 ---
+  // --- [project] 依存: saveToFile / exportCSV / exportMarkdown / exportCSVToClipboard ---
+  // これらは project の現在値を関数実行時に読むため、updater 形式が使えず [project] 依存。
   // Header など1コンポーネントにのみ渡るため、project 変化ごとの再生成コストは無視可。
-  // updater 形式を使えない（project の現在値を関数実行時に読む必要がある）ため [project] 依存。
 
-  const saveToFile = useCallback(() =>
-    downloadText(JSON.stringify(project, null, 2), `${project.projectName}.ymscript`, "application/json"), [project]);
+  const saveToFile = useCallback(() => {
+    const base = sanitizeFilename(project.projectName);
+    downloadText(JSON.stringify(project, null, 2), `${base}.ymscript`, "application/json");
+  }, [project]);
 
-  // loadFromFile は project を読まない（parse 後に setProject で上書き）が、
-  // useCallback([]) にしても動作上問題ない。プランに倣い [] 依存とする。
+  // --- [] 独立: loadFromFile / importMarkdown ---
+  // これらは project を参照せず、parse 後に setProject で上書きするだけなので [] で安定参照。
+
   const loadFromFile = useCallback(async (file: File) => {
     const text = await readFileAsText(file);
     setProject(parseProjectFile(JSON.parse(text)));
   }, []);
 
-  const exportCSV = useCallback(() =>
-    downloadText(buildCSV(project), `${project.projectName}.csv`, "text/csv;charset=utf-8"), [project]);
+  const exportCSV = useCallback(() => {
+    const base = sanitizeFilename(project.projectName);
+    downloadText(buildCSV(project), `${base}.csv`, "text/csv;charset=utf-8");
+  }, [project]);
 
-  const exportMarkdown = useCallback(() =>
-    downloadText(buildMarkdown(project), `${project.projectName}.md`, "text/markdown;charset=utf-8"), [project]);
+  const exportMarkdown = useCallback(() => {
+    const base = sanitizeFilename(project.projectName);
+    downloadText(buildMarkdown(project), `${base}.md`, "text/markdown;charset=utf-8");
+  }, [project]);
 
-  // importMarkdown は project を読まない（parse 後に setProject で上書き）が [project] 依存とする。
-  // ただし実際には project 参照が不要なので [] でも正しく動く。プランに倣いここは [] とする。
+  // project を読まないため [] で安定参照（loadFromFile と同じ）。
   const importMarkdown = useCallback(async (file: File): Promise<number> => {
     const text = await readFileAsText(file);
     const { project: parsed, skippedLines } = parseMarkdown(text);

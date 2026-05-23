@@ -1,6 +1,15 @@
 // src/utils/file.ts
 import type { Character, Line, Project } from "../types";
 
+// ファイル名として不正な文字（パス区切り・Windowsで禁止される記号・制御文字）を
+// アンダースコアに置換する。ブラウザが anchor.download をそのままOSに渡す際、
+// 不正文字が含まれると動作がブラウザ依存になるため、保存前に正規化する。
+export const sanitizeFilename = (name: string): string => {
+  // eslint-disable-next-line no-control-regex
+  const sanitized = name.replace(/[/\\:*?"<>|\x00-\x1f]/g, "_").trim();
+  return sanitized.length > 0 ? sanitized : "untitled";
+};
+
 export const downloadBlob = (blob: Blob, filename: string): void => {
   const url = URL.createObjectURL(blob);
   const anchor = document.createElement("a");
