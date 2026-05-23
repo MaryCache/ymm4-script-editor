@@ -1,5 +1,5 @@
 // src/components/LineRow/LineRow.tsx
-import { memo, useState, type ChangeEvent } from "react";
+import { memo, useState, forwardRef, type ChangeEvent } from "react";
 import type { Character, Line } from "../../types";
 import styles from "./LineRow.module.css";
 
@@ -27,10 +27,17 @@ export type LineRowProps = {
   onCopy: (line: Line) => void;
 };
 
-// React.memo: props（line/characters/handlers）が参照同値なら再描画をスキップ。
-// useProject が「変わらない line・characters の参照を保つ」設計＋ App が安定ハンドラを渡す
-// ことで、500行中1行の編集で他行が再描画されない（NF-10）。
-export const LineRow = memo(function LineRow(props: LineRowProps) {
+// React.memo + forwardRef:
+//   memo: props（line/characters/handlers）が参照同値なら再描画をスキップ（NF-10）。
+//   forwardRef: ScriptEditor の useFLIP が FLIP アニメーションのために各行の DOM ノードを
+//     収集する必要があるため ref forwarding を追加（item 3）。
+//     ref は DOM 直接操作専用。LineRow の props / レンダーロジックは変わらない。
+//
+// Why forwardRef after memo: React.memo(forwardRef(...)) でも
+// forwardRef(React.memo(...)) でも動作するが、
+// `memo(forwardRef(...))` の方が「memo が外側」なので
+// props 変化なし → forwardRef コンポーネント自体がスキップされるため効率が良い。
+export const LineRow = memo(forwardRef<HTMLDivElement, LineRowProps>(function LineRow(props, ref) {
   const { line, characters, index, isFirst, isLast } = props;
 
   // セリフ入力フォーカス中は row に .focused クラスを付与し、視覚的ハイライトを行全体に広げる。
@@ -61,6 +68,7 @@ export const LineRow = memo(function LineRow(props: LineRowProps) {
 
   return (
     <div
+      ref={ref}
       className={focused ? `${styles.row} ${styles.focused}` : styles.row}
       style={rowStyle}
     >
@@ -153,4 +161,4 @@ export const LineRow = memo(function LineRow(props: LineRowProps) {
       </div>
     </div>
   );
-});
+}));
