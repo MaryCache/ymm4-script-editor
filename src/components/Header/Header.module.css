@@ -1,0 +1,8 @@
+/* src/components/Header/Header.module.css */
+.header { display: flex; align-items: center; gap: 8px; padding: 10px 16px; border-bottom: 1px solid var(--color-border); background: var(--color-surface); }
+.projectName { font-size: 16px; font-weight: 600; min-width: 12em; }
+.spacer { flex: 1; }
+.menu { position: relative; }
+.menu summary { list-style: none; cursor: pointer; padding: 6px 12px; border: 1px solid var(--color-border); border-radius: 6px; background: var(--color-surface); }
+.menu summary::-webkit-details-marker { display: none; }
+.menuItems { position: absolute; right: 0; top: 100%; margin-top: 4px; display: flex; flex-direction: column; gap: 4px; background: var(--color-surface); border: 1px solid var(--color-border); border-radius: 6px; padding: 6px; z-index: 10; white-space: nowrap; }
