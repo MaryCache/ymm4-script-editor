@@ -1,5 +1,5 @@
 // src/components/ProjectTabs/ProjectTabs.test.tsx
-import { render, screen } from "@testing-library/react";
+import { render, screen, act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { ProjectTabs } from "./ProjectTabs";
 import type { TabEntry } from "./ProjectTabs";
@@ -147,9 +147,7 @@ test("ダブルクリック後 Esc でキャンセル → onRename が呼ばれ�
 
 test("空文字で確定しても onRename が呼ばれない", async () => {
   const onRename = vi.fn();
-  render(
-    <ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={onRename} />,
-  );
+  render(<ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />);
   await userEvent.dblClick(screen.getByText("プロジェクト1"));
   const input = screen.getByRole("textbox", { name: "プロジェクト名を編集" });
   await userEvent.clear(input);
@@ -214,4 +212,199 @@ test("編集中は role=tab ボタンが消えて input が tabItem 直下に描
   expect(screen.getAllByRole("tab")).toHaveLength(1);
   // input は存在する
   expect(screen.getByRole("textbox", { name: "プロジェクト名を編集" })).toBeInTheDocument();
+});
+
+// ===== ① ＋ ボタン: 装飾 span（aria-hidden）を持つ =====
+// Why: ① の実装確認。スクリーンリーダーが ＋ 記号を読まないことを保証する。
+
+test("「＋」ボタンが aria-hidden な装飾 span を内包する", () => {
+  render(<ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />);
+  const newBtn = screen.getByRole("button", { name: "新しいプロジェクト" });
+  // 子要素に aria-hidden="true" の span が存在することを確認
+  const decorSpan = newBtn.querySelector("span[aria-hidden='true']");
+  expect(decorSpan).not.toBeNull();
+});
+
+// ===== ③ × reveal: 2タブ以上のとき closeBtnReveal クラスを持つ =====
+// Why: reveal クラスが付くことで CSS の hover/focus-within が有効になる。
+// jsdom で CSS 疑似クラスの視覚効果は確認できないが、クラス付与は確認可能。
+
+test("タブが2つ以上のとき × ボタンが reveal クラスを持つ", () => {
+  render(<ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />);
+  const closeBtns = screen.getAllByRole("button", { name: /を閉じる/ });
+  for (const btn of closeBtns) {
+    // CSS Modules はクラス名をハッシュ化するため className 文字列に "closeBtnReveal" が含まれるかで判定
+    expect(btn.className).toContain("closeBtnReveal");
+  }
+});
+
+// ===== ④ タブ退場: reduced-motion 環境では onClose 呼び出し後にゴーストが残らない =====
+// Why: テスト環境は matchMedia が prefers-reduced-motion: reduce = true を返す（setup.ts）。
+//   reduced 時はゴーストを生成せず即時消滅するため、onClose 後すぐに該当タブの痕跡がなくなる。
+//   これにより既存の「×クリックで onClose 即呼び」系テストが維持できることを確認する。
+
+test("reduced-motion 環境: タブ削除後にゴーストが残らない（退場ゴーストなし）", async () => {
+  const onClose = vi.fn();
+  const { rerender } = render(
+    <ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={onClose} onRename={noop} />,
+  );
+  // tab2 の × をクリック → onClose が呼ばれる
+  await userEvent.click(screen.getByRole("button", { name: "プロジェクト2 を閉じる" }));
+  expect(onClose).toHaveBeenCalledWith("t2");
+
+  // App が tabs を更新したことをシミュレート: tab2 を除いた props で再レンダー
+  rerender(<ProjectTabs tabs={[tab1]} activeId="t1" onSwitch={noop} onNew={noop} onClose={onClose} onRename={noop} />);
+
+  // reduced-motion 下ではゴーストが生成されないため aria-hidden="true" な要素は存在しない
+  // （tabGhost は aria-hidden でレンダーされる）
+  const ghosts = document.querySelectorAll("[aria-hidden='true']");
+  // aria-hidden 要素がゼロ、あるいは存在しても tabGhost クラスを持たないことを確認
+  for (const el of ghosts) {
+    expect(el.className).not.toContain("tabGhost");
+  }
+});
+
+// ===== ④ タブ退場ゴースト: 元インデックス位置に出現することを検証（C1 再発防止）=====
+// Why: useEffect → useLayoutEffect への移行後、ゴーストが元インデックス位置に挿入されることを
+//   保証する回帰テスト。
+// セットアップ: matchMedia を per-test で reduced=false に差し替え + vi.useFakeTimers()。
+// afterEach で元に戻し他テストへの影響を防ぐ。
+//
+// CSS Modules はクラス名をハッシュ化するため、tabGhost の判定は className の includes で行う。
+// DOM 兄弟順で「ゴーストが t1 の次・t3 の前」に位置することを確認する。
+
+describe("退場ゴースト位置・ライフサイクル（reduced=false / fake timers）", () => {
+  const originalMatchMedia = window.matchMedia;
+
+  beforeEach(() => {
+    // matchMedia を reduced=false に差し替える
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: (query: string) => ({
+        matches: false, // reduced-motion = false
+        media: query,
+        onchange: null,
+        addListener: () => {},
+        removeListener: () => {},
+        addEventListener: () => {},
+        removeEventListener: () => {},
+        dispatchEvent: () => false,
+      }),
+    });
+    vi.useFakeTimers({ shouldAdvanceTime: false });
+  });
+
+  afterEach(async () => {
+    // act でラップして pending state update をフラッシュしてからタイマーを消費する。
+    // これにより次テストの render 後にタイマーが発火して act 警告が出るのを防ぐ。
+    await act(async () => {
+      vi.runAllTimers();
+    });
+    vi.useRealTimers();
+    // matchMedia を元のスタブ（reduced=true）に戻す
+    Object.defineProperty(window, "matchMedia", {
+      writable: true,
+      value: originalMatchMedia,
+    });
+  });
+
+  test("中間タブ削除時: ゴーストが元の位置（t1 の次・t3 の前）に出現する", async () => {
+    const { rerender } = render(
+      <ProjectTabs tabs={[tab1, tab2, tab3]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+    );
+
+    // t2 を削除した props で再レンダー（App の状態更新をシミュレート）
+    // async act でラップし、さらに空の async act で pending state を追加フラッシュする。
+    // useLayoutEffect → setGhosts が React 19 + fake timers 環境で
+    // act バウンダリ外から発火する警告を防ぐ。
+    await act(async () => {
+      rerender(
+        <ProjectTabs tabs={[tab1, tab3]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+      );
+      await Promise.resolve();
+    });
+
+    // tabGhost クラスを持つ要素が存在することを確認
+    const ghostEls = document.querySelectorAll("[aria-hidden='true']");
+    const ghostTabEls = Array.from(ghostEls).filter((el) => el.className.includes("tabGhost"));
+    expect(ghostTabEls).toHaveLength(1);
+
+    const ghost = ghostTabEls[0]!;
+    // ゴーストに t2 の名前が表示されていること
+    expect(ghost.textContent).toContain("プロジェクト2");
+
+    // DOM 兄弟順の確認: tabList 直下の子を列挙して順序を検証
+    const tabList = screen.getByRole("tablist");
+    const children = Array.from(tabList.children);
+
+    // children は [t1-tabItem, ghost, t3-tabItem, newBtn] の順になるはず
+    const t1Idx = children.findIndex((el) => el.textContent?.includes("プロジェクト1") && el.className.includes("tabItem"));
+    const ghostIdx = children.indexOf(ghost);
+    const t3Idx = children.findIndex((el) => el.textContent?.includes("プロジェクト3") && el.className.includes("tabItem"));
+
+    expect(t1Idx).toBeGreaterThanOrEqual(0);
+    expect(ghostIdx).toBeGreaterThanOrEqual(0);
+    expect(t3Idx).toBeGreaterThanOrEqual(0);
+    // ゴーストは t1 の後・t3 の前
+    expect(ghostIdx).toBeGreaterThan(t1Idx);
+    expect(ghostIdx).toBeLessThan(t3Idx);
+  });
+
+  test("末尾タブ削除時: ゴーストが末尾（＋ の手前）に出現する", async () => {
+    const { rerender } = render(
+      <ProjectTabs tabs={[tab1, tab2, tab3]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+    );
+
+    // t3（末尾）を削除した props で再レンダー
+    await act(async () => {
+      rerender(
+        <ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+      );
+      await Promise.resolve();
+    });
+
+    const ghostEls = document.querySelectorAll("[aria-hidden='true']");
+    const ghostTabEls = Array.from(ghostEls).filter((el) => el.className.includes("tabGhost"));
+    expect(ghostTabEls).toHaveLength(1);
+
+    const ghost = ghostTabEls[0]!;
+    expect(ghost.textContent).toContain("プロジェクト3");
+
+    const tabList = screen.getByRole("tablist");
+    const children = Array.from(tabList.children);
+
+    // ゴーストは ＋ ボタン（最後の子）の直前にある
+    const ghostIdx = children.indexOf(ghost);
+    const newBtnIdx = children.length - 1; // newBtn は常に最後
+    expect(ghostIdx).toBe(newBtnIdx - 1);
+  });
+
+  test("ゴーストが REMOVE_DURATION(200ms) 経過後に DOM から消える", async () => {
+    const { rerender } = render(
+      <ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+    );
+
+    await act(async () => {
+      rerender(
+        <ProjectTabs tabs={[tab1]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+      );
+      await Promise.resolve();
+    });
+
+    // タイマー実行前: ゴーストが存在する
+    const beforeGhosts = Array.from(document.querySelectorAll("[aria-hidden='true']")).filter((el) =>
+      el.className.includes("tabGhost"),
+    );
+    expect(beforeGhosts).toHaveLength(1);
+
+    // REMOVE_DURATION(200ms) 経過後: ゴーストが消える
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+
+    const afterGhosts = Array.from(document.querySelectorAll("[aria-hidden='true']")).filter((el) =>
+      el.className.includes("tabGhost"),
+    );
+    expect(afterGhosts).toHaveLength(0);
+  });
 });

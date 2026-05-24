@@ -4,10 +4,16 @@
  * cold-blue-black カラーシステム / cyan アクセント。
  * アクティブタブを下線＋背景で強調。
  * タブが多い場合は横スクロール可能（overflow-x: auto）。
- * アニメ: appear-slide（新規追加）/ フェード（閉じ）/ アクティブ下線の CSS transition。
+ *
+ * アニメーション一覧:
+ *   ① ＋ ボタン hover 回転 — .newBtnPlus / .newBtn:hover .newBtnPlus
+ *   ② ＋ ボタン移動 FLIP  — JS で transform を直書き（CSS class 不要）
+ *   ③ × reveal            — .closeBtnReveal: opacity 0→1（hover / :focus-within）
+ *   ④ タブ退場            — .tabGhost + tabExit keyframe
+ *   existing: tabAppear（新規追加）/ アクティブ下線 CSS transition
  */
 
-/* ===== タブ行ラッパ: tabsTrack + 新規ボタン を横並び ===== */
+/* ===== タブ行ラッパ: tabsTrack のみを横並び（＋ はトラック内に移動）===== */
 .tabsRow {
   grid-area: tabs;
   display: flex;
@@ -30,12 +36,14 @@
   scrollbar-color: var(--border-2) transparent;
 }
 
-/* tablist ラッパ: インライン配置でタブを横並びにする */
+/* tablist ラッパ: インライン配置でタブを横並びにする。
+ * ＋ ボタンを内包するため min-width: max-content にする（スクロールコンテナ内で折り返さない）。
+ */
 .tabList {
   display: inline-flex;
   align-items: stretch;
   height: 100%;
-  min-width: 100%;
+  min-width: max-content;
 }
 
 /* ===== 個別タブ: tabItem ===== */
@@ -78,7 +86,6 @@
   cursor: pointer;
   white-space: nowrap;
   max-width: 180px;
-  transition: color 140ms var(--ease-out), background 140ms var(--ease-out);
   /* タブ下線（アクティブ時に cyan）*/
   box-shadow: inset 0 -2px 0 transparent;
   /* box-shadow の transition でアクティブ下線を滑らかに切り替える */
@@ -143,6 +150,9 @@
   display: flex;
   align-items: center;
   justify-content: center;
+  /* width/height を常に確保してレイアウトを保持する（opacity で隠すだけ）。
+   * これによりタブ幅が hover 時にガタつかない。
+   */
   width: 18px;
   height: 18px;
   margin: 0 4px 0 -4px;
@@ -153,14 +163,32 @@
   font-size: 11px;
   cursor: pointer;
   flex-shrink: 0;
-  transition: color 120ms var(--ease-out), background 120ms var(--ease-out);
-  /* tabIndex=-1 なので Tab フォーカスは当たらないが、クリック時に focus-visible が出ないよう */
   outline: none;
+  /* opacity と color/background の transition を統合 */
+  transition:
+    opacity 120ms var(--ease-out),
+    color 120ms var(--ease-out),
+    background 120ms var(--ease-out);
 }
 
 .closeBtn:hover {
   color: var(--danger);
   background: rgba(239, 106, 106, 0.12);
+}
+
+/* ③ × reveal: 最後の1タブ以外のボタン。
+ * 既定では見えない（opacity:0）がレイアウトは占有する。
+ * 親 .tabItem が hover / :focus-within のとき opacity:1 に遷移する。
+ * Why :focus-within: × は tabIndex=-1 なので Tab でフォーカスを当てられないが、
+ *   タブ本体ボタンにキーボードフォーカスが当たった時（:focus-within）も reveal する。
+ */
+.closeBtnReveal {
+  opacity: 0;
+}
+
+.tabItem:hover .closeBtnReveal,
+.tabItem:focus-within .closeBtnReveal {
+  opacity: 1;
 }
 
 /* 最後の1タブでは × を非表示（disabled + hidden）*/
@@ -170,20 +198,83 @@
   visibility: hidden;
 }
 
-/* ===== 「＋」新規ボタン ===== */
+/* ===== ④ 退場ゴースト =====
+ * tabs prop から id が消えたことを検知した後、REMOVE_DURATION ms だけレンダーする
+ * 「影法師」要素。tabExit アニメーションを再生して消える。
+ * 実際のタブ（.tabItem）と同じ見た目・サイズにして、消えていく様子を自然に見せる。
+ * aria-hidden="true" で a11y ツリーには不要（既に消えたタブ）。
+ */
+.tabGhost {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+  /* 幅は内容で決まるが、コラプスアニメで max-width → 0 にする */
+  max-width: 200px;
+  overflow: hidden;
+  padding: 0 10px 0 12px;
+  gap: 4px;
+  color: var(--text-2);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  border-right: 1px solid var(--border-1);
+  pointer-events: none;
+  /* duration は JS の REMOVE_DURATION(=200) と同期して 200ms に固定する。
+   * --remove-duration 変数は未定義のためリテラルで直書きする（M4 修正）。 */
+  animation: tabExit 200ms var(--ease-out) forwards;
+}
+
+/* 退場ゴーストのアニメーション: フェード + 幅コラプス */
+@keyframes tabExit {
+  0% {
+    opacity: 1;
+    max-width: 200px;
+    padding-left: 12px;
+    padding-right: 10px;
+  }
+  60% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+    max-width: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
+
+/* ゴーストの × は装飾専用（操作不可） */
+.closeBtnGhost {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0 4px 0 -4px;
+  flex-shrink: 0;
+  font-size: 11px;
+  color: var(--text-3);
+  pointer-events: none;
+}
+
+/* ===== ① ＋ 新規ボタン（タブリスト内配置）=====
+ * 最後のタブの直後に並ぶ。タブと一緒にスクロールする。
+ * border-left でタブとの区切りを示す。
+ * .newBtnPlus: aria-hidden の装飾 span。ScriptEditor の .plus と同パターンで hover 時に 90度回転。
+ */
 .newBtn {
   flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 34px;
-  height: 100%;
+  /* タブと同じ高さになるよう align-self: stretch + align-items: center で中央に寄せる */
+  align-self: stretch;
+  padding: 0 10px;
   background: transparent;
   border: none;
   border-left: 1px solid var(--border-1);
+  /* 右端にも区切り線を置き、スクロール時にタブ行との境界を明示する */
+  border-right: 1px solid var(--border-1);
   color: var(--text-3);
-  font-size: 16px;
-  line-height: 1;
   cursor: pointer;
   transition: color 140ms var(--ease-out), background 140ms var(--ease-out);
 }
@@ -199,6 +290,20 @@
   border-radius: 2px;
 }
 
+/* ① ＋ 装飾 span: hover で 90度回転（ScriptEditor の .plus と同パターン）。
+ * display:inline-block が transform の前提。aria-hidden なのでスクリーンリーダーは読まない。
+ */
+.newBtnPlus {
+  font-size: 16px;
+  line-height: 1;
+  display: inline-block;
+  transition: transform 220ms var(--ease-out);
+}
+
+.newBtn:hover .newBtnPlus {
+  transform: rotate(90deg);
+}
+
 /* ===== prefers-reduced-motion: アニメーションを無効化 ===== */
 @media (prefers-reduced-motion: reduce) {
   .tabItemEnter {
@@ -206,6 +311,22 @@
   }
 
   .tabBtn {
+    transition: none;
+  }
+
+  /* ③ × reveal: reduced 時も opacity:0 → ただし即時（transition: none で）*/
+  .closeBtn {
+    transition: none;
+  }
+
+  /* ④ 退場ゴースト: reduced 時はアニメなし（JS 側がゴースト自体を生成しないが、
+   * 万が一レンダーされても即座に消えるよう animation: none にする）*/
+  .tabGhost {
+    animation: none;
+  }
+
+  /* ① ＋ 回転: reduced 時は transition を止める */
+  .newBtnPlus {
     transition: none;
   }
 }
