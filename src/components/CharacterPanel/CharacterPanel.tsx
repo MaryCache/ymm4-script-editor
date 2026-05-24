@@ -6,8 +6,9 @@ import { ColorWheel } from "../ColorWheel";
 import styles from "./CharacterPanel.module.css";
 
 // ColorWheel ポップオーバーの概算サイズ（クランプ計算用）。
-const WHEEL_W = 220;
-const WHEEL_H = 300;
+// HSV カラーサークル版: width=236px (container.width)、height=330px 概算（ring+svSquare+hexRow）。
+const WHEEL_W = 244;
+const WHEEL_H = 330;
 
 // ドットの矩形を基準に、画面内に収まるポップオーバー位置を返す。
 // Why fixed + portal: サイドバー（.panel/.charList）が overflow:hidden/auto のため、

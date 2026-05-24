@@ -1,9 +1,9 @@
 /* ColorWheel.module.css
  *
- * 自前カラーピッカーのスタイル（依存ゼロ）。
+ * 自前カラーピッカー（HSV カラーサークル）のスタイル（依存ゼロ）。
  * CharacterPanel の色ドット近傍にポップオーバーとして表示される。
  *
- * アニメーション（§4.7 dropdown-enter-right 相当）:
+ * アニメーション（§4.7 dropdown-enter 相当）:
  *   入場: opacity 0→1 + scale 0.96→1, 180ms, var(--ease-out)。
  *   prefers-reduced-motion: reduce ではアニメーションなし。
  */
@@ -19,8 +19,8 @@
   flex-direction: column;
   align-items: center;
   gap: 14px;
-  width: 212px;
-  /* 入場アニメーション: dropdown-enter-right（opacity + scale 0.96→1） */
+  width: 236px;
+  /* 入場アニメーション: dropdown-enter（opacity + scale 0.96→1） */
   animation: dropdownEnter 0.18s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
   /* ポップオーバーが他の UI に隠れないよう z-index を設定 */
   position: relative;
@@ -53,6 +53,8 @@
   /* ドラッグ中の選択を防ぐ */
   user-select: none;
   -webkit-user-select: none;
+  /* SV スクエアを内側に絶対配置するための基点 */
+  position: relative;
 }
 
 .wheelSvg {
@@ -60,74 +62,40 @@
   touch-action: none; /* タッチデバイスのスクロールキャンセル */
 }
 
-/* ===== 明度スライダー行 ===== */
-.sliderRow {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
+/* ===== SV スクエア ===== */
+.svSquare {
+  position: absolute;
+  border-radius: 3px;
+  overflow: hidden;
+  cursor: crosshair;
+  touch-action: none;
+  /* SVG の pointer-events を貫いてこちらが受け取れるよう z-index を設定 */
+  z-index: 1;
 }
 
-.sliderLabel {
-  color: var(--text-2);
-  font-size: 11px;
-  flex-shrink: 0;
-  width: 24px;
-  text-align: right;
+/* 背景レイヤー1: 白→純色（横方向・彩度軸）— background は JS から注入 */
+.svLayerSat {
+  position: absolute;
+  inset: 0;
 }
 
-.sliderValue {
-  color: var(--text-2);
-  font-size: 11px;
-  font-family: var(--font-mono);
-  width: 32px;
-  text-align: right;
-  flex-shrink: 0;
+/* 背景レイヤー2: 透明→黒（縦方向・明度軸）— background は JS から注入 */
+.svLayerVal {
+  position: absolute;
+  inset: 0;
 }
 
-/* range input のスタイル: background は JS から sliderBg として注入する */
-.slider {
-  flex: 1;
-  min-width: 0;
-  height: 14px;
-  appearance: none;
-  -webkit-appearance: none;
-  border-radius: 7px;
-  outline: none;
-  cursor: pointer;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-}
-
-.slider:focus-visible {
-  outline: 2px solid var(--accent);
-  outline-offset: 2px;
-}
-
-/* Thumb (Chrome/Safari) */
-.slider::-webkit-slider-thumb {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 16px;
-  height: 16px;
+/* SV ハンドル（小円）: (s, v) 位置に表示 */
+.svHandle {
+  position: absolute;
+  width: 12px;
+  height: 12px;
   border-radius: 50%;
-  background: white;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-  cursor: grab;
-}
-.slider::-webkit-slider-thumb:active {
-  cursor: grabbing;
-}
-
-/* Thumb (Firefox) */
-.slider::-moz-range-thumb {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: white;
-  border: 2px solid rgba(0, 0, 0, 0.2);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
-  cursor: grab;
+  border: 2px solid; /* borderColor は JS から注入（明度に応じて黒/白）*/
+  /* translate(-50%, -50%) で中心をポインター位置に合わせる */
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.5);
 }
 
 /* ===== hex 入力行 ===== */

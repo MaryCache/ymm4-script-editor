@@ -1,6 +1,6 @@
 // src/components/ColorWheel/ColorWheel.tsx
 import { useEffect, useId, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
-import { hexToHsl, hslToHex } from "../../utils/color";
+import { hexToHsv, hsvToHex } from "../../utils/color";
 import styles from "./ColorWheel.module.css";
 
 /**
@@ -11,7 +11,7 @@ import styles from "./ColorWheel.module.css";
 export type ColorWheelProps = {
   /**
    * 現在の色（`#RRGGBB` 形式の CSS hex カラー）。
-   * 初期値として内部 HSL 状態を初期化するために使用する。
+   * 初期値として内部 HSV 状態を初期化するために使用する。
    */
   color: string;
   /**
@@ -25,12 +25,16 @@ export type ColorWheelProps = {
 };
 
 // 色相環の寸法定数。
-const WHEEL_SIZE = 180; // px — SVG コンテナの一辺
-const OUTER_R = 80; // 外径（px）
-const INNER_R = 54; // 内径（px）— リング幅 = OUTER_R - INNER_R = 26px
+const WHEEL_SIZE = 200; // px — SVG コンテナの一辺
+const OUTER_R = 90; // 外径（px）
+const INNER_R = 64; // 内径（px）— リング幅 = OUTER_R - INNER_R = 26px
 
-/** HSL 型エイリアス（内部状態）。 */
-type Hsl = { h: number; s: number; l: number };
+// SV スクエアの寸法: 内径の正方形（対角線が内径の円に内接）。
+// 内径円の半径 = INNER_R → 内接正方形の一辺 = INNER_R * √2
+const SV_SIZE = Math.floor(INNER_R * Math.SQRT2) - 4; // 4px のマージン
+
+/** HSV 型エイリアス（内部状態）。 */
+type Hsv = { h: number; s: number; v: number };
 
 /**
  * ポインター座標（コンテナ中心基準）から色相角（0–360）を算出するヘルパー。
@@ -48,20 +52,24 @@ const angleFromCenter = (cx: number, cy: number): number => {
   return deg;
 };
 
+/** 値を [min, max] にクランプするヘルパー。 */
+const clamp = (val: number, min: number, max: number): number => Math.max(min, Math.min(max, val));
+
 /**
- * 依存ゼロの自前カラーピッカーコンポーネント。
+ * 依存ゼロの自前カラーピッカーコンポーネント（HSV カラーサークル）。
  *
  * @remarks
- * - **色相環**: `conic-gradient` の SVG ラップで 360° のリングを描画。クリック / ドラッグ位置の
- *   角度から hue（0–360）を算出し、現在 hue のマーカー（白丸）を表示する。
- * - **明度スライダー**: hue・彩度（最低 60%）を保ちながら l を 0–100 で調整する range input。
+ * - **色相リング**: `conic-gradient` の SVG ラップで 360° のリングを描画。クリック / ドラッグ位置の
+ *   角度から hue（0–360）を算出し、現在 hue のマーカー（白丸）をリング上に表示する。
+ * - **SV スクエア**: リング内側に正方形。横方向に 白→純色、縦方向に 透明→黒 の2レイヤーで
+ *   HSV の彩度（s）・明度（v）を操作する。ハンドル（小円）を (s, v) 位置に表示。
  * - **hex 入力欄**: 6桁 hex を直接入力可能。妥当な値で `onChange` を呼ぶ。
  *   キーボードのみでも色指定できるためアクセシビリティを確保する。
- * - 内部状態は HSL で保持し、各ハンドラで `hslToHex` して `onChange` を呼ぶ。
- * - 初期値は `hexToHsl(color)` で設定。彩度は最低 60% を確保。
+ * - 内部状態は HSV で保持し、各ハンドラで `hsvToHex` して `onChange` を呼ぶ。
+ * - 初期値は `hexToHsv(color)` で設定。
  * - ポップオーバーとして表示される想定（位置は使用側が制御する）。
  *   外側クリック / Esc で `onClose` を呼ぶ。
- * - 入場アニメーション: `dropdown-enter-right`（opacity + scale 0.96→1, ~0.18s）。
+ * - 入場アニメーション: `dropdownEnter`（opacity + scale 0.96→1, ~0.18s）。
  * - `prefers-reduced-motion: reduce` ではアニメーションなし。
  *
  * @param props - {@link ColorWheelProps}
@@ -72,20 +80,20 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   const uid = useId();
   const ringClipId = `ring-clip-${uid}`;
 
-  // 初期 HSL は props.color から算出する。彩度は最低 60% を確保（表示映えの最低ライン）。
-  const initial = hexToHsl(color);
-  const [hsl, setHsl] = useState<Hsl>({
-    h: initial.h,
-    s: Math.max(initial.s, 60),
-    l: initial.l,
-  });
+  // 初期 HSV は props.color から算出する。
+  const initial = hexToHsv(color);
+  const [hsv, setHsv] = useState<Hsv>({ h: initial.h, s: initial.s, v: initial.v });
 
-  // hex 入力フィールドの制御値。入力途中の文字列（例: "#ff"）を保持するため hsl とは分離する。
-  const [hexInput, setHexInput] = useState(hslToHex(initial.h, Math.max(initial.s, 60), initial.l));
+  // hex 入力フィールドの制御値。入力途中の文字列（例: "#ff"）を保持するため hsv とは分離する。
+  const [hexInput, setHexInput] = useState(hsvToHex(initial.h, initial.s, initial.v));
 
   const containerRef = useRef<HTMLDivElement>(null);
   // ドラッグ状態は ref で管理（setState を経ない = 再描画を引き起こさない）。
-  const isDragging = useRef(false);
+  const isDraggingRing = useRef(false);
+  const isDraggingSv = useRef(false);
+
+  // SV スクエアの DOM 参照（ポインター座標を要素ローカル座標に変換するため）。
+  const svRef = useRef<HTMLDivElement>(null);
 
   // 外側クリック検知: containerRef の外を mousedown したら onClose。
   useEffect(() => {
@@ -113,19 +121,19 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  // ===== 内部ヘルパー: HSL を更新し onChange / hex 入力欄を同期する =====
+  // ===== 内部ヘルパー: HSV を更新し onChange / hex 入力欄を同期する =====
   // useCallback を使わず React Compiler の最適化に委ねる（eslint-plugin-react-hooks v7 に準拠）。
-  const applyHsl = (next: Hsl) => {
-    setHsl(next);
-    const hex = hslToHex(next.h, next.s, next.l);
+  const applyHsv = (next: Hsv) => {
+    setHsv(next);
+    const hex = hsvToHex(next.h, next.s, next.v);
     onChange(hex);
     setHexInput(hex);
   };
 
-  // ===== 色相環インタラクション =====
+  // ===== 色相リングインタラクション =====
 
   /**
-   * SVG コンテナ上のポインター座標から色相を算出して applyHsl を呼ぶ共通ヘルパー。
+   * SVG コンテナ上のポインター座標から色相を算出して applyHsv を呼ぶ共通ヘルパー。
    *
    * @param clientX - ポインターのビューポート X 座標
    * @param clientY - ポインターのビューポート Y 座標
@@ -139,28 +147,57 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
     const cx = clientX - svgLeft - WHEEL_SIZE / 2;
     const cy = clientY - svgTop - WHEEL_SIZE / 2;
     const newHue = Math.round(angleFromCenter(cx, cy));
-    applyHsl({ ...hsl, h: newHue });
+    applyHsv({ ...hsv, h: newHue });
   };
 
-  const handlePointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
-    isDragging.current = true;
-    (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
+  const handleRingPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+    isDraggingRing.current = true;
+    // setPointerCapture: jsdom 未実装のため optional chaining でガード。
+    (e.currentTarget as SVGSVGElement).setPointerCapture?.(e.pointerId);
     applyHueFromPointer(e.clientX, e.clientY);
   };
 
-  const handlePointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
-    if (!isDragging.current) return;
+  const handleRingPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+    if (!isDraggingRing.current) return;
     applyHueFromPointer(e.clientX, e.clientY);
   };
 
-  const handlePointerUp = () => {
-    isDragging.current = false;
+  const handleRingPointerUp = () => {
+    isDraggingRing.current = false;
   };
 
-  // ===== 明度スライダー =====
+  // ===== SV スクエアインタラクション =====
 
-  const handleLightnessChange = (e: ChangeEvent<HTMLInputElement>) => {
-    applyHsl({ ...hsl, l: Number(e.target.value) });
+  /**
+   * SV スクエア上のポインター座標から彩度・明度を算出して applyHsv を呼ぶ共通ヘルパー。
+   *
+   * @param clientX - ポインターのビューポート X 座標
+   * @param clientY - ポインターのビューポート Y 座標
+   */
+  const applySvFromPointer = (clientX: number, clientY: number) => {
+    if (!svRef.current) return;
+    const rect = svRef.current.getBoundingClientRect();
+    const x = clientX - rect.left;
+    const y = clientY - rect.top;
+    const newS = Math.round(clamp((x / rect.width) * 100, 0, 100));
+    const newV = Math.round(clamp((1 - y / rect.height) * 100, 0, 100));
+    applyHsv({ ...hsv, s: newS, v: newV });
+  };
+
+  const handleSvPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    isDraggingSv.current = true;
+    // setPointerCapture: jsdom 未実装のため optional chaining でガード。
+    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
+    applySvFromPointer(e.clientX, e.clientY);
+  };
+
+  const handleSvPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!isDraggingSv.current) return;
+    applySvFromPointer(e.clientX, e.clientY);
+  };
+
+  const handleSvPointerUp = () => {
+    isDraggingSv.current = false;
   };
 
   // ===== hex 入力 =====
@@ -171,42 +208,55 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
     // # + 6桁 hex の形式で妥当なときのみ内部状態を更新する。
     const match = /^#([0-9a-fA-F]{6})$/.exec(raw.trim());
     if (match) {
-      const parsed = hexToHsl(raw.trim());
-      const next: Hsl = { h: parsed.h, s: Math.max(parsed.s, 60), l: parsed.l };
-      setHsl(next);
-      onChange(hslToHex(next.h, next.s, next.l));
+      const parsed = hexToHsv(raw.trim());
+      const next: Hsv = { h: parsed.h, s: parsed.s, v: parsed.v };
+      setHsv(next);
+      onChange(hsvToHex(next.h, next.s, next.v));
       // hex 入力欄は raw のまま保持（ユーザーが入力中の値を書き換えない）。
     }
   };
 
-  // ===== マーカー位置の計算 =====
+  // ===== マーカー位置の計算（色相リング）=====
   // 現在 hue のリング中央（半径 = (OUTER_R + INNER_R) / 2）上の座標を算出する。
   const markerR = (OUTER_R + INNER_R) / 2;
   // CSS conic-gradient の 0deg=12時方向・時計回り → atan2 座標系（0=3時, 反時計）への変換。
-  const markerAngleDeg = 90 - hsl.h;
+  const markerAngleDeg = 90 - hsv.h;
   const markerAngleRad = (markerAngleDeg * Math.PI) / 180;
   const markerX = WHEEL_SIZE / 2 + markerR * Math.cos(markerAngleRad);
   const markerY = WHEEL_SIZE / 2 - markerR * Math.sin(markerAngleRad);
 
-  // 明度スライダーのグラデーション: 現在の hue・彩度で l=0〜100。
-  const sliderBg = `linear-gradient(to right, hsl(${hsl.h},${hsl.s}%,0%), hsl(${hsl.h},${hsl.s}%,50%), hsl(${hsl.h},${hsl.s}%,100%))`;
+  // ===== SV スクエアの背景 =====
+  // 上レイヤー: 横方向に 白→現在 hue の純色
+  // 下レイヤー: 縦方向に 透明→黒
+  // 「白→純色」の純色は HSL(h, 100%, 50%) で近似（HSV の s=100, v=100 に相当する表示色）。
+  const pureColor = `hsl(${hsv.h} 100% 50%)`;
+  const svBgSaturation = `linear-gradient(to right, #fff, ${pureColor})`;
+  const svBgValue = "linear-gradient(to top, #000, transparent)";
+
+  // SV ハンドルの位置（0–100% で指定）。
+  const handleLeft = `${hsv.s}%`;
+  const handleTop = `${100 - hsv.v}%`;
+
+  // ハンドル枠色: 明度（v）が低い場合は白、高い場合は黒で視認性を確保する。
+  const handleBorderColor = hsv.v < 50 ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.5)";
 
   // 現在の hex（swatch と aria ラベルに使用）。
-  const currentHex = hslToHex(hsl.h, hsl.s, hsl.l);
+  const currentHex = hsvToHex(hsv.h, hsv.s, hsv.v);
 
   return (
     <div ref={containerRef} className={styles.container} role="group" aria-label="カラーピッカー">
-      {/* ===== 色相環（SVG ラップ conic-gradient）===== */}
+      {/* ===== 色相リング（SVG ラップ conic-gradient）+ SV スクエア ===== */}
       {/* aria-hidden: 装飾的要素。キーボード操作は hex 入力欄で担保する。 */}
       <div className={styles.wheelWrapper} aria-hidden="true">
+        {/* 色相リング SVG */}
         <svg
           width={WHEEL_SIZE}
           height={WHEEL_SIZE}
           className={styles.wheelSvg}
-          onPointerDown={handlePointerDown}
-          onPointerMove={handlePointerMove}
-          onPointerUp={handlePointerUp}
-          onPointerCancel={handlePointerUp}
+          onPointerDown={handleRingPointerDown}
+          onPointerMove={handleRingPointerMove}
+          onPointerUp={handleRingPointerUp}
+          onPointerCancel={handleRingPointerUp}
           style={{ cursor: "crosshair" }}
         >
           <defs>
@@ -250,26 +300,39 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
             style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.5))", pointerEvents: "none" }}
           />
         </svg>
-      </div>
 
-      {/* ===== 明度スライダー ===== */}
-      <div className={styles.sliderRow}>
-        <label className={styles.sliderLabel} htmlFor="cw-lightness">
-          明度
-        </label>
-        {/* min={5} / max={95}: 完全な黒・白を避け、スウォッチとスライダーの視認性を保つための下限・上限。 */}
-        <input
-          id="cw-lightness"
-          type="range"
-          min={5}
-          max={95}
-          value={hsl.l}
-          onChange={handleLightnessChange}
-          className={styles.slider}
-          style={{ background: sliderBg }}
-          aria-label="明度"
-        />
-        <span className={styles.sliderValue}>{hsl.l}%</span>
+        {/* SV スクエア: 色相リングの内側に絶対配置 */}
+        {/* pointer イベントは SVG と重なると SVG が取るため、SV 専用の div で独立して捕捉する。 */}
+        <div
+          ref={svRef}
+          className={styles.svSquare}
+          style={{
+            width: SV_SIZE,
+            height: SV_SIZE,
+            // リング中心に配置: top/left = (WHEEL_SIZE - SV_SIZE) / 2 + padding(4px)
+            top: (WHEEL_SIZE - SV_SIZE) / 2 + 4,
+            left: (WHEEL_SIZE - SV_SIZE) / 2 + 4,
+          }}
+          onPointerDown={handleSvPointerDown}
+          onPointerMove={handleSvPointerMove}
+          onPointerUp={handleSvPointerUp}
+          onPointerCancel={handleSvPointerUp}
+        >
+          {/* 背景レイヤー1: 白→純色（横方向・彩度軸）*/}
+          <div className={styles.svLayerSat} style={{ background: svBgSaturation }} />
+          {/* 背景レイヤー2: 透明→黒（縦方向・明度軸）*/}
+          <div className={styles.svLayerVal} style={{ background: svBgValue }} />
+          {/* SV ハンドル（小円）: (s, v) の位置を示す */}
+          <div
+            className={styles.svHandle}
+            style={{
+              left: handleLeft,
+              top: handleTop,
+              borderColor: handleBorderColor,
+              background: currentHex,
+            }}
+          />
+        </div>
       </div>
 
       {/* ===== hex 入力欄 ===== */}
