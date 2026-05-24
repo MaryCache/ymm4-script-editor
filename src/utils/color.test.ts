@@ -71,6 +71,11 @@ test("hslToHex: 出力は常に # + 6桁小文字", () => {
   expect(result).toMatch(/^#[0-9a-f]{6}$/);
 });
 
+// h=360 は色相環の境界値（360 === 0 で赤）。#ff0000 を返すことを保証する。
+test("hslToHex: h=360 は h=0 と同じ赤 #ff0000 を返す", () => {
+  expect(hslToHex(360, 100, 50)).toBe("#ff0000");
+});
+
 // ===== hex → hsl → hex 往復テスト =====
 
 test("往復テスト: #ff0000 → hsl → hex がほぼ一致", () => {

@@ -1,5 +1,5 @@
 // src/components/PasteImportModal/PasteImportModal.tsx
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useId } from "react";
 import { Modal } from "../Modal";
 import styles from "./PasteImportModal.module.css";
 
@@ -21,9 +21,6 @@ export type PasteImportModalProps = {
   onImport: (text: string) => void;
 };
 
-const TITLE_ID = "paste-import-title";
-const DESC_ID = "paste-import-desc";
-
 /**
  * プレーンテキストをコピペでインポートするモーダルコンポーネント。
  *
@@ -38,6 +35,12 @@ const DESC_ID = "paste-import-desc";
  * @param props - {@link PasteImportModalProps}
  */
 export function PasteImportModal({ open, onClose, onImport }: PasteImportModalProps) {
+  // useId: 同一ページに複数のモーダルが並存してもアクセシビリティ id が衝突しないよう
+  // React が生成するコンポーネント固有の id を使用する。
+  const uid = useId();
+  const titleId = `paste-import-title-${uid}`;
+  const descId = `paste-import-desc-${uid}`;
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   const handleImport = useCallback(() => {
@@ -47,34 +50,26 @@ export function PasteImportModal({ open, onClose, onImport }: PasteImportModalPr
       return;
     }
     onImport(text);
-    // textarea をリセット（次回開いた時に前の内容が残らないようにする）
-    if (textareaRef.current) textareaRef.current.value = "";
     onClose();
+    // textarea の手動リセット不要: Modal は open=false で内側の DOM ごと unmount するため、
+    // 次回 open 時は新鮮な textarea が再マウントされる。
   }, [onImport, onClose]);
 
   const handleClose = useCallback(() => {
-    // キャンセル時も textarea をリセット
-    if (textareaRef.current) textareaRef.current.value = "";
     onClose();
+    // textarea の手動リセット不要: open=false で DOM ごと破棄されるためリセット不要。
   }, [onClose]);
 
   return (
-    <Modal
-      open={open}
-      onClose={handleClose}
-      role="dialog"
-      titleId={TITLE_ID}
-      descId={DESC_ID}
-      initialFocus={textareaRef}
-    >
+    <Modal open={open} onClose={handleClose} role="dialog" titleId={titleId} descId={descId} initialFocus={textareaRef}>
       <div className={styles.inner}>
-        <h2 id={TITLE_ID} className={styles.title}>
+        <h2 id={titleId} className={styles.title}>
           テキストをコピペでインポート
         </h2>
-        <p id={DESC_ID} className={styles.desc}>
+        <p id={descId} className={styles.desc}>
           改行ごとに1行・すべて先頭キャラクターに割り当てて末尾に追加します
         </p>
-        {/* 非制御テキストエリア: ref で値を読むため onChange は不要 */}
+        {/* 非制御テキストエリア: ref で値を読む。open=false で DOM ごと unmount されるため手動リセット不要。 */}
         <textarea ref={textareaRef} className={styles.textarea} aria-label="インポートするテキスト" rows={10} />
         <div className={styles.actions}>
           <button className={styles.btnCancel} onClick={handleClose}>

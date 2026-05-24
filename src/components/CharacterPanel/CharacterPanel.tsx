@@ -1,5 +1,5 @@
 // src/components/CharacterPanel/CharacterPanel.tsx
-import { useState, useCallback, useRef, type ChangeEvent, type KeyboardEvent } from "react";
+import { useState, useCallback, type ChangeEvent, type KeyboardEvent } from "react";
 import type { Character } from "../../types";
 import { ColorWheel } from "../ColorWheel";
 import styles from "./CharacterPanel.module.css";
@@ -176,10 +176,6 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
     setColorEditingId(null);
   }, []);
 
-  // ポップオーバー位置のアンカー: 各ドットボタンの ref を id → ref のマップで管理する。
-  // useRef で Map を保持（レンダリングをトリガーしない）。
-  const dotRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
-
   return (
     <aside className={styles.sidebar}>
       {/* ===== Panel header ===== */}
@@ -232,9 +228,6 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
               {/* position: relative でポップオーバーのアンカーにする。 */}
               <span className={styles.dotWrapper}>
                 <button
-                  ref={(el) => {
-                    dotRefs.current.set(c.id, el);
-                  }}
                   type="button"
                   className={styles.dotBtn}
                   aria-label={`${c.name} の色を変更`}
@@ -262,7 +255,7 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
                 /* 編集中: <input> を表示。オートフォーカス＆テキスト全選択。 */
                 <input
                   className={styles.nameInput}
-                  aria-label="キャラクター名を編集"
+                  aria-label={`${c.name} の名前を編集`}
                   value={editValue}
                   autoFocus
                   onFocus={(e) => e.currentTarget.select()}

@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useProject } from "./hooks/useProject";
 import { Header } from "./components/Header/Header";
 import { CharacterPanel } from "./components/CharacterPanel/CharacterPanel";
@@ -66,6 +66,9 @@ export default function App() {
   // isResetting: true の間 ScriptEditor の .lines に fadeout クラスを付与。
   // prefers-reduced-motion: reduce では 即時クリア（タイマー不要）。
   const [isResetting, setIsResetting] = useState(false);
+  // resetTimerRef: handleConfirmReset が複数回呼ばれた場合や unmount 時に
+  // 前回のタイマーをキャンセルして clearAllLines の二重実行を防ぐ。
+  const resetTimerRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
 
   const handleOpenPasteImport = useCallback(() => setPasteImportOpen(true), []);
   const handleClosePasteImport = useCallback(() => setPasteImportOpen(false), []);
@@ -89,13 +92,27 @@ export default function App() {
       clearAllLines();
       return;
     }
+    // 前回のタイマーが残っている場合はキャンセルして二重実行を防ぐ。
+    if (resetTimerRef.current !== null) {
+      window.clearTimeout(resetTimerRef.current);
+    }
     // フェードアウト (~220ms) してから clearAllLines
     setIsResetting(true);
-    window.setTimeout(() => {
+    resetTimerRef.current = window.setTimeout(() => {
+      resetTimerRef.current = null;
       clearAllLines();
       setIsResetting(false);
     }, 230);
   }, [clearAllLines]);
+
+  // unmount 時に残存タイマーをクリアして clearAllLines の遅延実行を防ぐ。
+  useEffect(() => {
+    return () => {
+      if (resetTimerRef.current !== null) {
+        window.clearTimeout(resetTimerRef.current);
+      }
+    };
+  }, []);
 
   // copyLine は characters が変わった時のみ再生成。テキスト編集では characters 参照は不変なので、
   // 毎打鍵で LineRow が再描画されることはない（NF-10 維持）。

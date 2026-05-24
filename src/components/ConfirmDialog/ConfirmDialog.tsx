@@ -1,5 +1,5 @@
 // src/components/ConfirmDialog/ConfirmDialog.tsx
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useId } from "react";
 import { Modal } from "../Modal";
 import styles from "./ConfirmDialog.module.css";
 
@@ -36,9 +36,6 @@ export type ConfirmDialogProps = {
   danger?: boolean;
 };
 
-const TITLE_ID = "confirm-dialog-title";
-const DESC_ID = "confirm-dialog-desc";
-
 /**
  * 汎用確認ダイアログコンポーネント。
  *
@@ -61,6 +58,12 @@ export function ConfirmDialog({
   onClose,
   danger = false,
 }: ConfirmDialogProps) {
+  // useId: 同一ページに複数のダイアログが並存してもアクセシビリティ id が衝突しないよう
+  // React が生成するコンポーネント固有の id を使用する。
+  const uid = useId();
+  const titleId = `confirm-dialog-title-${uid}`;
+  const descId = `confirm-dialog-desc-${uid}`;
+
   const cancelRef = useRef<HTMLButtonElement>(null);
 
   const handleConfirm = useCallback(() => {
@@ -69,19 +72,12 @@ export function ConfirmDialog({
   }, [onConfirm, onClose]);
 
   return (
-    <Modal
-      open={open}
-      onClose={onClose}
-      role="alertdialog"
-      titleId={TITLE_ID}
-      descId={DESC_ID}
-      initialFocus={cancelRef}
-    >
+    <Modal open={open} onClose={onClose} role="alertdialog" titleId={titleId} descId={descId} initialFocus={cancelRef}>
       <div className={styles.inner}>
-        <h2 id={TITLE_ID} className={styles.title}>
+        <h2 id={titleId} className={styles.title}>
           {title}
         </h2>
-        <p id={DESC_ID} className={styles.message}>
+        <p id={descId} className={styles.message}>
           {message}
         </p>
         <div className={styles.actions}>

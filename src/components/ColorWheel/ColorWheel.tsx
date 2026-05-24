@@ -1,5 +1,5 @@
 // src/components/ColorWheel/ColorWheel.tsx
-import { useEffect, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useId, useRef, useState, type ChangeEvent, type PointerEvent as ReactPointerEvent } from "react";
 import { hexToHsl, hslToHex } from "../../utils/color";
 import styles from "./ColorWheel.module.css";
 
@@ -67,6 +67,11 @@ const angleFromCenter = (cx: number, cy: number): number => {
  * @param props - {@link ColorWheelProps}
  */
 export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
+  // useId: 同一ページに複数の ColorWheel が同時に描画されてもクリッパー id が衝突しないよう
+  // React が生成するコンポーネント固有の id を使用する。
+  const uid = useId();
+  const ringClipId = `ring-clip-${uid}`;
+
   // 初期 HSL は props.color から算出する。彩度は最低 60% を確保（表示映えの最低ライン）。
   const initial = hexToHsl(color);
   const [hsl, setHsl] = useState<Hsl>({
@@ -94,10 +99,13 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   }, [onClose]);
 
   // Esc キーで閉じる。
+  // stopImmediatePropagation: ColorWheel が開いている状態で Esc を押したとき、
+  // 背後にある Modal の keydown リスナーまで伝播して二重に onClose が呼ばれることを防ぐ。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
         e.preventDefault();
+        e.stopImmediatePropagation();
         onClose();
       }
     };
@@ -106,7 +114,7 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   }, [onClose]);
 
   // ===== 内部ヘルパー: HSL を更新し onChange / hex 入力欄を同期する =====
-  // React Compiler が最適化するため useCallback は使わない（manual memoization の衝突回避）。
+  // useCallback を使わず React Compiler の最適化に委ねる（eslint-plugin-react-hooks v7 に準拠）。
   const applyHsl = (next: Hsl) => {
     setHsl(next);
     const hex = hslToHex(next.h, next.s, next.l);
@@ -117,20 +125,19 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   // ===== 色相環インタラクション =====
 
   /**
-   * ポインター位置から色相を更新する。
-   * SVG コンテナの中心を原点として atan2 で角度を算出する。
+   * SVG コンテナ上のポインター座標から色相を算出して applyHsl を呼ぶ共通ヘルパー。
+   *
+   * @param clientX - ポインターのビューポート X 座標
+   * @param clientY - ポインターのビューポート Y 座標
    */
-  const updateHueFromPointer = (e: { clientX: number; clientY: number }) => {
+  const applyHueFromPointer = (clientX: number, clientY: number) => {
     if (!containerRef.current) return;
     const rect = containerRef.current.getBoundingClientRect();
     // wheelWrapper の padding (4px) を考慮した SVG 内の中心座標を計算。
     const svgLeft = rect.left + 4; // .wheelWrapper の padding-left
     const svgTop = rect.top + 4; // .wheelWrapper の padding-top
-    const cx = e.clientX - svgLeft - WHEEL_SIZE / 2;
-    const cy = e.clientY - svgTop - WHEEL_SIZE / 2;
-    const dist = Math.sqrt(cx * cx + cy * cy);
-    // ドラッグ中でない場合はリング領域外のクリックを無視する。
-    if (!isDragging.current && (dist < INNER_R || dist > OUTER_R)) return;
+    const cx = clientX - svgLeft - WHEEL_SIZE / 2;
+    const cy = clientY - svgTop - WHEEL_SIZE / 2;
     const newHue = Math.round(angleFromCenter(cx, cy));
     applyHsl({ ...hsl, h: newHue });
   };
@@ -138,12 +145,12 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   const handlePointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
     isDragging.current = true;
     (e.currentTarget as SVGSVGElement).setPointerCapture(e.pointerId);
-    updateHueFromPointer(e);
+    applyHueFromPointer(e.clientX, e.clientY);
   };
 
   const handlePointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
     if (!isDragging.current) return;
-    updateHueFromPointer(e);
+    applyHueFromPointer(e.clientX, e.clientY);
   };
 
   const handlePointerUp = () => {
@@ -204,7 +211,7 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
         >
           <defs>
             {/* リング形状のクリッパー: 外円 - 内円（evenodd で穴を作る）*/}
-            <clipPath id="ring-clip">
+            <clipPath id={ringClipId}>
               <path
                 d={`
                   M ${WHEEL_SIZE / 2} ${WHEEL_SIZE / 2 - OUTER_R}
@@ -220,7 +227,7 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
           </defs>
 
           {/* conic-gradient を foreignObject 経由で描画（SVG 内 CSS gradient の代替手法）*/}
-          <foreignObject x="0" y="0" width={WHEEL_SIZE} height={WHEEL_SIZE} clipPath="url(#ring-clip)">
+          <foreignObject x="0" y="0" width={WHEEL_SIZE} height={WHEEL_SIZE} clipPath={`url(#${ringClipId})`}>
             <div
               style={{
                 width: `${WHEEL_SIZE}px`,
@@ -250,6 +257,7 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
         <label className={styles.sliderLabel} htmlFor="cw-lightness">
           明度
         </label>
+        {/* min={5} / max={95}: 完全な黒・白を避け、スウォッチとスライダーの視認性を保つための下限・上限。 */}
         <input
           id="cw-lightness"
           type="range"

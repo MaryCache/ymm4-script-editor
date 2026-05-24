@@ -93,8 +93,8 @@ test("名前をダブルクリックすると編集 input が表示される", a
 
   await userEvent.dblClick(screen.getByText("霊夢"));
 
-  // 編集モード: aria-label="キャラクター名を編集" の input が出現
-  expect(screen.getByRole("textbox", { name: "キャラクター名を編集" })).toBeInTheDocument();
+  // 編集モード: aria-label="霊夢 の名前を編集" の input が出現（M-6: キャラ別 aria-label）
+  expect(screen.getByRole("textbox", { name: "霊夢 の名前を編集" })).toBeInTheDocument();
 });
 
 test("編集 input で Enter を押すと onRename が (id, 新名) で呼ばれる", async () => {
@@ -110,14 +110,15 @@ test("編集 input で Enter を押すと onRename が (id, 新名) で呼ばれ
   );
   await userEvent.dblClick(screen.getByText("霊夢"));
 
-  const input = screen.getByRole("textbox", { name: "キャラクター名を編集" });
+  // M-6: aria-label はキャラ名を含む（"霊夢 の名前を編集"）
+  const input = screen.getByRole("textbox", { name: "霊夢 の名前を編集" });
   await userEvent.clear(input);
   await userEvent.type(input, "博麗霊夢");
   await userEvent.keyboard("{Enter}");
 
   expect(onRename).toHaveBeenCalledWith("c1", "博麗霊夢");
   // 編集 input は消える
-  expect(screen.queryByRole("textbox", { name: "キャラクター名を編集" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "霊夢 の名前を編集" })).not.toBeInTheDocument();
 });
 
 test("編集中に Esc を押すとキャンセルされ onRename は呼ばれない", async () => {
@@ -133,14 +134,15 @@ test("編集中に Esc を押すとキャンセルされ onRename は呼ばれ�
   );
   await userEvent.dblClick(screen.getByText("霊夢"));
 
-  const input = screen.getByRole("textbox", { name: "キャラクター名を編集" });
+  // M-6: aria-label はキャラ名を含む（"霊夢 の名前を編集"）
+  const input = screen.getByRole("textbox", { name: "霊夢 の名前を編集" });
   await userEvent.clear(input);
   await userEvent.type(input, "削除されるべきでない入力");
   await userEvent.keyboard("{Escape}");
 
   expect(onRename).not.toHaveBeenCalled();
   // 編集 input は消える
-  expect(screen.queryByRole("textbox", { name: "キャラクター名を編集" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("textbox", { name: "霊夢 の名前を編集" })).not.toBeInTheDocument();
 });
 
 test("trim 後が空文字の状態で確定しても onRename は呼ばれない", async () => {
@@ -156,7 +158,8 @@ test("trim 後が空文字の状態で確定しても onRename は呼ばれな�
   );
   await userEvent.dblClick(screen.getByText("霊夢"));
 
-  const input = screen.getByRole("textbox", { name: "キャラクター名を編集" });
+  // M-6: aria-label はキャラ名を含む（"霊夢 の名前を編集"）
+  const input = screen.getByRole("textbox", { name: "霊夢 の名前を編集" });
   await userEvent.clear(input);
   await userEvent.type(input, "   ");
   await userEvent.keyboard("{Enter}");
