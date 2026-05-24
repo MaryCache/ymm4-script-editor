@@ -1,5 +1,13 @@
 // src/components/CharacterPanel/CharacterPanel.tsx
-import { useState, useCallback, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
+import {
+  useState,
+  useCallback,
+  useEffect,
+  useRef,
+  type ChangeEvent,
+  type CSSProperties,
+  type KeyboardEvent,
+} from "react";
 import { createPortal } from "react-dom";
 import type { Character } from "../../types";
 import { ColorWheel } from "../ColorWheel";
@@ -111,6 +119,21 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
   // prefers-reduced-motion チェックにより reduced モードでは即時削除。
   const REMOVE_DURATION = 180; // ms — CSS animation duration と一致させる
 
+  // 削除アニメーション用タイマーの id を保持する Set。
+  // unmount 時に cleanup で全タイマーをクリアし、
+  // stale closure による setState-after-unmount を防ぐ。
+  const removeTimerIds = useRef(new Set<ReturnType<typeof window.setTimeout>>());
+
+  useEffect(() => {
+    const ids = removeTimerIds.current;
+    return () => {
+      for (const id of ids) {
+        window.clearTimeout(id);
+      }
+      ids.clear();
+    };
+  }, []);
+
   const handleDelete = useCallback(
     (id: string) => {
       if (!canDelete) return;
@@ -120,7 +143,8 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
         return;
       }
       setRemovingIds((prev) => ({ ...prev, [id]: true }));
-      window.setTimeout(() => {
+      const timerId = window.setTimeout(() => {
+        removeTimerIds.current.delete(timerId);
         onDelete(id);
         // removingIds のクリーンアップは onDelete 後に characters が更新されると
         // そのキャラが list から消えるため、state のクリーンアップは省略可能だが
@@ -131,6 +155,7 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
           return next;
         });
       }, REMOVE_DURATION);
+      removeTimerIds.current.add(timerId);
     },
     [canDelete, onDelete],
   );

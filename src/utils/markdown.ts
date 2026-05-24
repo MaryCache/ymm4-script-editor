@@ -145,8 +145,14 @@ const sanitizeLine = (s: string): string => s.replace(/\r\n|\r|\n/g, " ");
  * @remarks
  * YAML フロントマター（`---` 区切り）にプロジェクト名とキャラクター色を書き出し、
  * 本文は `キャラ名: テキスト` 形式で各行を並べる。
- * `projectName` やキャラ名に含まれる改行はスペースに置換して
- * フロントマターの `---` 区切りが崩れるのを防ぐ。
+ * `projectName` / キャラ名 / 本文テキストに含まれる改行はスペースに置換して
+ * 本文での行区切り誤認とフロントマターの `---` 崩れを防ぐ。
+ *
+ * @remarks
+ * **round-trip 保証の範囲**: 典型的な入力（改行なし・`: ` を含まない・行頭 `#` なし）では
+ * `parseMarkdown(buildMarkdown(project))` が元データを再現する。
+ * ただし `text` 内の `: `（区切り誤認）や行頭 `#`（見出し誤認）は
+ * エスケープしないため、これらを含む場合の厳密な可逆性は保証しない。
  *
  * @param project - 変換対象のプロジェクト
  * @returns Markdown テキスト文字列（末尾 `\n` 付き）
@@ -164,7 +170,7 @@ export const buildMarkdown = (project: Project): string => {
   ].join("\n");
 
   const nameById = new Map(project.characters.map((c) => [c.id, c.name]));
-  const bodyText = project.lines.map((l) => `${nameById.get(l.characterId) ?? ""}: ${l.text}`).join("\n");
+  const bodyText = project.lines.map((l) => `${nameById.get(l.characterId) ?? ""}: ${sanitizeLine(l.text)}`).join("\n");
 
   return head + bodyText + "\n";
 };

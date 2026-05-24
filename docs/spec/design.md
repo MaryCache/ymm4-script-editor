@@ -318,9 +318,9 @@ export default defineConfig({
 
 | 状況 | 対応 |
 |---|---|
-| `.ymscript` のパースに失敗 | `alert` でエラーを通知。状態は変更しない |
-| localStorage の書き込み失敗（容量オーバー等） | エラーをコンソールに出力。アプリはクラッシュさせない |
-| クリップボードへのアクセス拒否 | **実装では `alert` で通知**（§10.9。「赤くする」視覚表現は将来課題） |
+| `.ymscript` のパースに失敗 | **実装では error Toast** で通知。状態は変更しない |
+| localStorage の書き込み失敗（容量オーバー等） | コンソール出力＋`onPersistError` 経由で error Toast 通知。アプリはクラッシュさせない |
+| クリップボードへのアクセス拒否 | **実装では error Toast で通知**（§10.9。「赤くする」視覚表現は将来課題） |
 | キャラクターが0人の状態でのライン追加 | ボタンを disabled にして防止する |
 | ファイル名・不正な読み込みデータ | §10.9 を参照（サニタイズ／状態不変） |
 
@@ -444,9 +444,10 @@ Header は `@media (display-mode: window-controls-overlay)` で `app-region:drag
 
 ### 10.9 エラーハンドリング（§8 更新）
 
-- クリップボード失敗 → **alert で通知**（「赤くする」視覚表現は将来課題）。
+- クリップボード失敗 → **error Toast で通知**（独自 Toast。alert はブロッキングで PWA 体験を損なうため不採用。「赤くする」視覚表現は将来課題）。
 - ファイル名は `sanitizeFilename` で不正文字を `_`、空は `untitled`。
-- 不正な `.ymscript`/JSON 読み込みは throw → 呼び出し元 alert、**状態は不変**（テスト済み）。
+- 不正な `.ymscript`/JSON 読み込みは throw → 呼び出し元で error Toast 通知、**状態は不変**（テスト済み）。
+- localStorage 書き込み失敗（容量超過等）は `useProject` の `onPersistError` で App に伝播し error Toast を表示（console.error も維持）。
 
 ### 10.10 キャラクター識別色の自動付与（utils/color.ts）— F-02
 

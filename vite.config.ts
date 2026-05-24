@@ -1,5 +1,6 @@
 import { defineConfig } from "vite";
-import react from "@vitejs/plugin-react";
+import react, { reactCompilerPreset } from "@vitejs/plugin-react";
+import babel from "@rolldown/plugin-babel";
 import { VitePWA } from "vite-plugin-pwa";
 
 // アイコンはユーザー提供の透過 PNG（public/icon-192.png / icon-512.png、元 1024px から縮小）。
@@ -12,6 +13,13 @@ export default defineConfig({
   base: "/ymm4-script-editor/",
   plugins: [
     react(),
+    // React Compiler を有効化。@vitejs/plugin-react v6（Oxc ベース）では babel オプションが
+    // 廃止されたため、@rolldown/plugin-babel に reactCompilerPreset を渡して組み込む。
+    // これにより LineRow の memo() や useProject の useCallback([]) といった NF-10 向けの
+    // 手動メモ化は Compiler の自動メモ化で裏打ちされる（eslint-plugin-react-hooks v7 の
+    // preserve-manual-memoization 前提と実ビルドがこれで一致する）。
+    // target は React 19 がデフォルト（react/compiler-runtime を使用）。
+    babel({ presets: [reactCompilerPreset()] }),
     VitePWA({
       registerType: "autoUpdate",
       includeAssets: ["favicon.png", "icon-192.png", "icon-512.png"],

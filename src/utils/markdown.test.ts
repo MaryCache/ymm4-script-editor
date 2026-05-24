@@ -112,3 +112,56 @@ test("buildMarkdown は完全形式で round-trip できる（色は保持）", 
   // ID は保持されない（新規採番）
   expect(restored.characters[0]!.id).not.toBe("c1");
 });
+
+test("buildMarkdown: Line.text に改行を含む場合、出力が1行に収まる", () => {
+  // \n / \r\n / \r の3種類すべてスペースに畳まれる
+  const original: Project = {
+    version: 1,
+    projectName: "P",
+    characters: [{ id: "c1", name: "霊夢", color: "#FF6B6B" }],
+    lines: [
+      { id: "l1", characterId: "c1", text: "1行目\n2行目" },
+      { id: "l2", characterId: "c1", text: "A\r\nB" },
+      { id: "l3", characterId: "c1", text: "X\rY" },
+    ],
+  };
+  const md = buildMarkdown(original);
+  // フロントマター以降の本文行を取り出す
+  const bodyLines = md.split("\n").filter((line) => line.startsWith("霊夢: "));
+  // 改行を含む text は各々1本の body 行に収まる（3行あるはず）
+  expect(bodyLines).toHaveLength(3);
+  expect(bodyLines[0]).toBe("霊夢: 1行目 2行目");
+  expect(bodyLines[1]).toBe("霊夢: A B");
+  expect(bodyLines[2]).toBe("霊夢: X Y");
+});
+
+test("buildMarkdown: Line.text に改行後 parseMarkdown で行数・対応が保たれる", () => {
+  // 改行畳み後に round-trip しても lines の件数とキャラ対応が正しい
+  const original: Project = {
+    version: 1,
+    projectName: "P",
+    characters: [
+      { id: "c1", name: "霊夢", color: "#FF6B6B" },
+      { id: "c2", name: "魔理沙", color: "#FFB347" },
+    ],
+    lines: [
+      { id: "l1", characterId: "c1", text: "こんにちは\n世界" },
+      { id: "l2", characterId: "c2", text: "やあ" },
+      { id: "l3", characterId: "c1", text: "またね" },
+    ],
+  };
+  const md = buildMarkdown(original);
+  const { project: restored, skippedLines } = parseMarkdown(md);
+  // 改行畳みにより元の3行がそのまま3行として復元される
+  expect(restored.lines).toHaveLength(3);
+  expect(skippedLines).toBe(0);
+  // text 内の改行はスペースに置換されて復元される
+  expect(restored.lines[0]!.text).toBe("こんにちは 世界");
+  expect(restored.lines[1]!.text).toBe("やあ");
+  expect(restored.lines[2]!.text).toBe("またね");
+  // キャラ対応: 0番と2番は同じキャラ名（霊夢）
+  const nameById = new Map(restored.characters.map((c) => [c.id, c.name]));
+  expect(nameById.get(restored.lines[0]!.characterId)).toBe("霊夢");
+  expect(nameById.get(restored.lines[1]!.characterId)).toBe("魔理沙");
+  expect(nameById.get(restored.lines[2]!.characterId)).toBe("霊夢");
+});

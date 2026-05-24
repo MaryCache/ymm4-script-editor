@@ -121,8 +121,9 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   }, [onClose]);
 
   // Esc キーで閉じる。
-  // stopImmediatePropagation: ColorWheel が開いている状態で Esc を押したとき、
-  // 背後にある Modal の keydown リスナーまで伝播して二重に onClose が呼ばれることを防ぐ。
+  // stopImmediatePropagation: 現状 ColorWheel は Modal 内では使用していないため
+  // 二重 onClose は起こり得ないが、将来の内側配置に備えた防御的措置として残す。
+  // 将来 Modal 内に置く場合は document リスナーの登録順依存になる点に注意。
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === "Escape") {
