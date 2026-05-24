@@ -38,8 +38,8 @@ function checkShouldPlay(): boolean {
 // 偶奇でわずかに角度をずらし、距離・遅延を散らして「弾けた」自然さを出す。
 const BURST_PARTICLES = Array.from({ length: 30 }, (_, i) => ({
   angle: (360 / 30) * i + (i % 2 === 0 ? 6 : -6),
-  dist: 130 + (i % 5) * 30,
-  size: 2 + (i % 3),
+  dist: 190 + (i % 5) * 42,
+  size: 2.5 + (i % 3),
   delay: (i % 6) * 28,
 }));
 

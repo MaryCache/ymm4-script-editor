@@ -16,8 +16,14 @@ test("500行でも全行レンダリングされ、合計文字数が正しい",
   const lines = makeLines(500);
   const total = lines.reduce((s, l) => s + l.text.length, 0);
   const handlers = {
-    onAddLine: () => {}, onCharacterChange: () => {}, onTextChange: () => {},
-    onMoveUp: () => {}, onMoveDown: () => {}, onAddAfter: () => {}, onDelete: () => {}, onCopy: () => {},
+    onAddLine: () => {},
+    onCharacterChange: () => {},
+    onTextChange: () => {},
+    onMoveUp: () => {},
+    onMoveDown: () => {},
+    onAddAfter: () => {},
+    onDelete: () => {},
+    onCopy: () => {},
   };
   render(<ScriptEditor characters={characters} lines={lines} {...handlers} />);
   expect(screen.getAllByRole("textbox", { name: "セリフ" })).toHaveLength(500);
@@ -28,8 +34,14 @@ test("500行のうち1行に入力しても onTextChange が正しい行IDで発
   const lines = makeLines(500);
   const onTextChange = vi.fn();
   const handlers = {
-    onAddLine: () => {}, onCharacterChange: () => {}, onTextChange,
-    onMoveUp: () => {}, onMoveDown: () => {}, onAddAfter: () => {}, onDelete: () => {}, onCopy: () => {},
+    onAddLine: () => {},
+    onCharacterChange: () => {},
+    onTextChange,
+    onMoveUp: () => {},
+    onMoveDown: () => {},
+    onAddAfter: () => {},
+    onDelete: () => {},
+    onCopy: () => {},
   };
   render(<ScriptEditor characters={characters} lines={lines} {...handlers} />);
   const inputs = screen.getAllByRole("textbox", { name: "セリフ" });

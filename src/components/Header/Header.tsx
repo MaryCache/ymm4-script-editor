@@ -53,11 +53,7 @@ type OpenMenu = "save" | "load" | null;
 // Why mousedown (not click): click はポップアップ内ボタンの action 後にも伝播し得るが、
 // mousedown は action より先に発火するため「外をクリックして閉じる」に適している。
 // enabled フラグで無効時はリスナーを登録しない（パフォーマンス最適化）。
-function useOutsideClick(
-  ref: React.RefObject<HTMLElement | null>,
-  onClose: () => void,
-  enabled: boolean,
-) {
+function useOutsideClick(ref: React.RefObject<HTMLElement | null>, onClose: () => void, enabled: boolean) {
   useEffect(() => {
     if (!enabled) return;
     const handler = (e: globalThis.MouseEvent) => {
@@ -117,9 +113,12 @@ export function Header(props: HeaderProps) {
   // Escape キーで閉じる（keyboard a11y）。
   // M-1: onKeyDown を .headerActions ではなく <header> に移すことで、
   // プロジェクト名入力にフォーカスがあっても Escape でメニューを閉じられる。
-  const handleKeyDown = useCallback((e: ReactKeyboardEvent<HTMLElement>) => {
-    if (e.key === "Escape") closeMenu();
-  }, [closeMenu]);
+  const handleKeyDown = useCallback(
+    (e: ReactKeyboardEvent<HTMLElement>) => {
+      if (e.key === "Escape") closeMenu();
+    },
+    [closeMenu],
+  );
 
   const toggleSave = useCallback((e: MouseEvent<HTMLButtonElement>) => {
     e.stopPropagation();
@@ -134,10 +133,13 @@ export function Header(props: HeaderProps) {
   // メニュー項目クリック: アクションを実行してメニューを閉じる。
   // Why useCallback with inner factory: 各項目のクリックハンドラは異なる action を持つが、
   // いずれも setOpenMenu(null) を呼ぶ共通処理を持つ。
-  const runAndClose = useCallback((action: () => void) => () => {
-    action();
-    setOpenMenu(null);
-  }, []);
+  const runAndClose = useCallback(
+    (action: () => void) => () => {
+      action();
+      setOpenMenu(null);
+    },
+    [],
+  );
 
   // ===== メニューパネル ref（I-4: フォーカス管理用）=====
   const saveMenuPanelRef = useRef<HTMLDivElement>(null);
@@ -150,7 +152,7 @@ export function Header(props: HeaderProps) {
   useEffect(() => {
     const panelRef = openMenu === "save" ? saveMenuPanelRef : openMenu === "load" ? loadMenuPanelRef : null;
     if (!panelRef?.current) return;
-    const firstItem = panelRef.current.querySelector<HTMLButtonElement>("button[role=\"menuitem\"]");
+    const firstItem = panelRef.current.querySelector<HTMLButtonElement>('button[role="menuitem"]');
     firstItem?.focus();
   }, [openMenu]);
 
@@ -172,19 +174,25 @@ export function Header(props: HeaderProps) {
 
   // onChange ハンドラ: ファイルを handler に渡し、同じファイルの連続選択を可能にするため
   // value をリセットする。ref.current へのアクセスは change イベント発火時（レンダー外）で安全。
-  const onChangeYmscript = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onLoadYmscript(file);
-    // 同じファイルを連続選択できるよう value をリセットする（change イベントが再発火するため）。
-    if (ymscriptInputRef.current) ymscriptInputRef.current.value = "";
-  }, [onLoadYmscript]);
+  const onChangeYmscript = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) onLoadYmscript(file);
+      // 同じファイルを連続選択できるよう value をリセットする（change イベントが再発火するため）。
+      if (ymscriptInputRef.current) ymscriptInputRef.current.value = "";
+    },
+    [onLoadYmscript],
+  );
 
-  const onChangeMarkdown = useCallback((e: ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) onLoadMarkdown(file);
-    // 同じファイルを連続選択できるよう value をリセットする（change イベントが再発火するため）。
-    if (markdownInputRef.current) markdownInputRef.current.value = "";
-  }, [onLoadMarkdown]);
+  const onChangeMarkdown = useCallback(
+    (e: ChangeEvent<HTMLInputElement>) => {
+      const file = e.target.files?.[0];
+      if (file) onLoadMarkdown(file);
+      // 同じファイルを連続選択できるよう value をリセットする（change イベントが再発火するため）。
+      if (markdownInputRef.current) markdownInputRef.current.value = "";
+    },
+    [onLoadMarkdown],
+  );
 
   return (
     // M-1: onKeyDown を header ルートに置くことで、プロジェクト名入力にフォーカスがある状態でも
@@ -193,7 +201,12 @@ export function Header(props: HeaderProps) {
       {/* ===== Left: brand mark + project name ===== */}
       <div className={styles.brand}>
         {/* ユーザー提供のタイトルロゴ画像。装飾なので alt は空 + aria-hidden。 */}
-        <img className={styles.brandLogo} src={`${import.meta.env.BASE_URL}header-logo.png`} alt="" aria-hidden="true" />
+        <img
+          className={styles.brandLogo}
+          src={`${import.meta.env.BASE_URL}header-logo.png`}
+          alt=""
+          aria-hidden="true"
+        />
         <div className={styles.brandSep} aria-hidden="true" />
         <input
           className={styles.projectName}
@@ -214,7 +227,9 @@ export function Header(props: HeaderProps) {
          * アクセシブル名 "全件コピー" は維持（aria-label でもテキストでも同一）。
          */}
         <button className={styles.btnCopyAll} onClick={onCopyAll} aria-label="全件コピー">
-          <span className={styles.copyAllIcon} aria-hidden="true">⧉</span>
+          <span className={styles.copyAllIcon} aria-hidden="true">
+            ⧉
+          </span>
           全件コピー
         </button>
 
@@ -232,12 +247,7 @@ export function Header(props: HeaderProps) {
          *   アクセシブル名 "保存▼" は維持（▼ を aria-hidden にしない）。
          */}
         <div className={styles.menuWrapper}>
-          <button
-            className={styles.btn}
-            aria-haspopup="menu"
-            aria-expanded={openMenu === "save"}
-            onClick={toggleSave}
-          >
+          <button className={styles.btn} aria-haspopup="menu" aria-expanded={openMenu === "save"} onClick={toggleSave}>
             保存<span className={`${styles.chev} ${openMenu === "save" ? styles.chevOpen : ""}`}>▼</span>
           </button>
           {openMenu === "save" && (
@@ -273,12 +283,7 @@ export function Header(props: HeaderProps) {
 
         {/* ===== 読込メニュー (item 5) ===== */}
         <div className={styles.menuWrapper}>
-          <button
-            className={styles.btn}
-            aria-haspopup="menu"
-            aria-expanded={openMenu === "load"}
-            onClick={toggleLoad}
-          >
+          <button className={styles.btn} aria-haspopup="menu" aria-expanded={openMenu === "load"} onClick={toggleLoad}>
             読込<span className={`${styles.chev} ${openMenu === "load" ? styles.chevOpen : ""}`}>▼</span>
           </button>
           {openMenu === "load" && (

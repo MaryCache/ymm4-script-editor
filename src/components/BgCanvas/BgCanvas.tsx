@@ -19,15 +19,15 @@ import { useEffect, useRef } from "react";
 
 // 粒の型: depth 0.0〜1.0 (0=奥=移動少, 1=手前=移動多)
 type Particle = {
-  x: number;       // 基準 x (0〜1 の正規化座標)
-  y: number;       // 基準 y (0〜1 の正規化座標)
-  r: number;       // 半径 px (logical)
-  alpha: number;   // ベース不透明度
-  depth: number;   // 視差係数
-  driftX: number;  // 常時ドリフト速度 x (px/frame, 正規化)
-  driftY: number;  // 常時ドリフト速度 y (px/frame, 正規化)
-  phase: number;   // alpha パルスの位相 (ゆっくりした明暗変化用)
-  speed: number;   // alpha パルスの速さ (rad/frame)
+  x: number; // 基準 x (0〜1 の正規化座標)
+  y: number; // 基準 y (0〜1 の正規化座標)
+  r: number; // 半径 px (logical)
+  alpha: number; // ベース不透明度
+  depth: number; // 視差係数
+  driftX: number; // 常時ドリフト速度 x (px/frame, 正規化)
+  driftY: number; // 常時ドリフト速度 y (px/frame, 正規化)
+  phase: number; // alpha パルスの位相 (ゆっくりした明暗変化用)
+  speed: number; // alpha パルスの速さ (rad/frame)
 };
 
 // 52粒固定（モジュール冒頭コメント「52粒固定」と一致）
@@ -43,7 +43,7 @@ function makeParticles(count: number): Particle[] {
     particles.push({
       x: Math.random(),
       y: Math.random(),
-      r: Math.random() * 1.6 + 0.6,      // 0.6〜2.2 px
+      r: Math.random() * 1.6 + 0.6, // 0.6〜2.2 px
       alpha: Math.random() * 0.22 + 0.06, // 0.06〜0.28 — 淡め
       depth: Math.random(),
       driftX: (Math.random() - 0.5) * 2 * DRIFT_MAX,
@@ -144,16 +144,16 @@ export function BgCanvas() {
         p.x += p.driftX;
         p.y += p.driftY;
         if (p.x < -0.05) p.x = 1.05;
-        if (p.x > 1.05)  p.x = -0.05;
+        if (p.x > 1.05) p.x = -0.05;
         if (p.y < -0.05) p.y = 1.05;
-        if (p.y > 1.05)  p.y = -0.05;
+        if (p.y > 1.05) p.y = -0.05;
 
         // alpha パルス: sin 波でゆっくり明暗
         p.phase += p.speed;
         const alphaMod = 1 + Math.sin(p.phase) * 0.3; // 0.7〜1.3 倍
 
         // 視差シフト: depth が大きい粒ほど大きく動く
-        const px = p.x * width  + offsetX * p.depth;
+        const px = p.x * width + offsetX * p.depth;
         const py = p.y * height + offsetY * p.depth;
 
         // 描画 — cyan (#58d3f0) の淡い点。

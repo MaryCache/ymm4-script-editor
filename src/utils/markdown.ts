@@ -31,13 +31,23 @@ const parseFrontmatter = (block: string): Frontmatter => {
     if (line.trim() === "" || line.trim() === "characters:") continue;
 
     const project = line.match(/^\s*project:\s*(.+)$/);
-    if (project) { result.projectName = unquote(project[1]!); continue; }
+    if (project) {
+      result.projectName = unquote(project[1]!);
+      continue;
+    }
 
     const name = line.match(/^\s*-\s*name:\s*(.+)$/);
-    if (name) { current = { name: unquote(name[1]!), color: "" }; result.characters.push(current); continue; }
+    if (name) {
+      current = { name: unquote(name[1]!), color: "" };
+      result.characters.push(current);
+      continue;
+    }
 
     const color = line.match(/^\s*color:\s*(.+)$/);
-    if (color && current) { current.color = unquote(color[1]!); continue; }
+    if (color && current) {
+      current.color = unquote(color[1]!);
+      continue;
+    }
   }
   return result;
 };
@@ -104,11 +114,17 @@ export const parseMarkdown = (raw: string): ParseResult => {
     if (line === "" || line.startsWith("#")) continue;
 
     const sep = line.indexOf(": "); // 区切りは「コロン＋半角スペース」のみ
-    if (sep <= 0) { skippedLines++; continue; }
+    if (sep <= 0) {
+      skippedLines++;
+      continue;
+    }
 
     const name = line.slice(0, sep).trim();
     const text = line.slice(sep + 2).trim();
-    if (name === "") { skippedLines++; continue; }
+    if (name === "") {
+      skippedLines++;
+      continue;
+    }
 
     lines.push({ id: generateId(), characterId: ensureCharacter(name).id, text });
   }
@@ -142,9 +158,7 @@ export const buildMarkdown = (project: Project): string => {
     "---",
     `project: ${sanitizeLine(project.projectName)}`,
     "characters:",
-    ...project.characters.map((c) =>
-      [`  - name: ${sanitizeLine(c.name)}`, `    color: "${c.color}"`].join("\n")
-    ),
+    ...project.characters.map((c) => [`  - name: ${sanitizeLine(c.name)}`, `    color: "${c.color}"`].join("\n")),
     "---",
     "",
   ].join("\n");

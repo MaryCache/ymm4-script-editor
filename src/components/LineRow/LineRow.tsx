@@ -1,5 +1,13 @@
 // src/components/LineRow/LineRow.tsx
-import { memo, useState, useRef, useEffect, forwardRef, type ChangeEvent, type KeyboardEvent as ReactKeyboardEvent } from "react";
+import {
+  memo,
+  useState,
+  useRef,
+  useEffect,
+  forwardRef,
+  type ChangeEvent,
+  type KeyboardEvent as ReactKeyboardEvent,
+} from "react";
 import type { Character, Line } from "../../types";
 import styles from "./LineRow.module.css";
 
@@ -8,8 +16,8 @@ import styles from "./LineRow.module.css";
 //   warn: 字幕が長くなりはじめる目安（YMM4 デフォルト表示行数を参考）。
 //   long: 明らかに長すぎる — 字幕テロップが切れる可能性が高い。
 //   文字数の表示値そのものは変えない（数値が消えると逆効果）。
-const LINE_WARN_CHARS = 25;  // この文字数以上で warn
-const LINE_LONG_CHARS = 40;  // この文字数以上で long（warn より優先）
+const LINE_WARN_CHARS = 25; // この文字数以上で warn
+const LINE_LONG_CHARS = 40; // この文字数以上で long（warn より優先）
 
 /**
  * `LineRow` コンポーネントの props 型。
@@ -134,10 +142,7 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
   useEffect(() => {
     if (!open) return;
     const handler = (e: MouseEvent) => {
-      if (
-        !toggleRef.current?.contains(e.target as Node) &&
-        !listRef.current?.contains(e.target as Node)
-      ) {
+      if (!toggleRef.current?.contains(e.target as Node) && !listRef.current?.contains(e.target as Node)) {
         setOpen(false);
         setFocusedIndex(-1);
       }
@@ -157,12 +162,21 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
   const handleToggleKeyDown = (e: ReactKeyboardEvent<HTMLButtonElement>) => {
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
-      if (open) { closeDropdown(); } else { openDropdown(); }
+      if (open) {
+        closeDropdown();
+      } else {
+        openDropdown();
+      }
     } else if (e.key === "ArrowDown") {
       e.preventDefault();
-      if (!open) { openDropdown(); }
+      if (!open) {
+        openDropdown();
+      }
     } else if (e.key === "Escape") {
-      if (open) { e.stopPropagation(); closeDropdown(); }
+      if (open) {
+        e.stopPropagation();
+        closeDropdown();
+      }
     }
   };
 
@@ -201,29 +215,28 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
         aria-expanded={open}
         aria-label="キャラクター"
         type="button"
-        onClick={() => { if (open) { closeDropdown(); } else { openDropdown(); } }}
+        onClick={() => {
+          if (open) {
+            closeDropdown();
+          } else {
+            openDropdown();
+          }
+        }}
         onKeyDown={handleToggleKeyDown}
       >
         {/* 色ドット */}
-        <span
-          className={styles.charDot}
-          style={{ background: selectedColor }}
-          aria-hidden="true"
-        />
+        <span className={styles.charDot} style={{ background: selectedColor }} aria-hidden="true" />
         {/* キャラ名 */}
         <span className={styles.charDisplay}>{selectedName}</span>
         {/* シェブロン ▼ */}
-        <span className={`${styles.charChevron} ${open ? styles.charChevronOpen : ""}`} aria-hidden="true">▼</span>
+        <span className={`${styles.charChevron} ${open ? styles.charChevronOpen : ""}`} aria-hidden="true">
+          ▼
+        </span>
       </button>
 
       {/* ポップアップリスト: ul/li で AT 相互運用性を確保（ARIA in HTML 勧告準拠） */}
       {open && (
-        <ul
-          ref={listRef}
-          role="listbox"
-          aria-label="キャラクター選択"
-          className={styles.charListbox}
-        >
+        <ul ref={listRef} role="listbox" aria-label="キャラクター選択" className={styles.charListbox}>
           {characters.map((c, idx) => (
             <li
               key={c.id}
@@ -234,11 +247,7 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
               onClick={() => selectChar(c.id)}
               onKeyDown={(e) => handleOptionKeyDown(e, idx)}
             >
-              <span
-                className={styles.charDot}
-                style={{ background: c.color }}
-                aria-hidden="true"
-              />
+              <span className={styles.charDot} style={{ background: c.color }} aria-hidden="true" />
               <span>{c.name}</span>
             </li>
           ))}
@@ -277,114 +286,104 @@ function CharDropdown({ lineId, characterId, characters, onCharacterChange, rowS
  * @param props - {@link LineRowProps}
  * @param ref - `ScriptEditor` の FLIP が DOM 直接操作に使う ref
  */
-export const LineRow = memo(forwardRef<HTMLDivElement, LineRowProps>(function LineRow(props, ref) {
-  const { line, characters, index, isFirst, isLast } = props;
+export const LineRow = memo(
+  forwardRef<HTMLDivElement, LineRowProps>(function LineRow(props, ref) {
+    const { line, characters, index, isFirst, isLast } = props;
 
-  // セリフ入力フォーカス中は row に .focused クラスを付与し、視覚的ハイライトを行全体に広げる。
-  const [focused, setFocused] = useState(false);
+    // セリフ入力フォーカス中は row に .focused クラスを付与し、視覚的ハイライトを行全体に広げる。
+    const [focused, setFocused] = useState(false);
 
-  // キャラ色: 選択中キャラの hex。見つからない場合は transparent（CSS 変数のフォールバック）。
-  const color = characters.find((c) => c.id === line.characterId)?.color ?? "transparent";
+    // キャラ色: 選択中キャラの hex。見つからない場合は transparent（CSS 変数のフォールバック）。
+    const color = characters.find((c) => c.id === line.characterId)?.color ?? "transparent";
 
-  // count-badge の状態判定
-  const len = line.text.length;
-  const badgeClass =
-    len >= LINE_LONG_CHARS ? `${styles.countBadge} ${styles.long}`
-    : len >= LINE_WARN_CHARS ? `${styles.countBadge} ${styles.warn}`
-    : styles.countBadge;
+    // count-badge の状態判定
+    const len = line.text.length;
+    const badgeClass =
+      len >= LINE_LONG_CHARS
+        ? `${styles.countBadge} ${styles.long}`
+        : len >= LINE_WARN_CHARS
+          ? `${styles.countBadge} ${styles.warn}`
+          : styles.countBadge;
 
-  // --char 変数を行ルート要素に注入する style オブジェクト。
-  // Why memo-safe: オブジェクトは毎レンダーで新参照になるが、memo の shallow 比較では
-  // style は常に異なるオブジェクトとみなされる。ただし color は string primitive なので
-  // 同じキャラが選ばれている限り color 文字列は同値 → style の変化は memo 外から来る
-  // props(line.characterId 変更)によるものだけ。LineRow の再描画は必要なので許容する。
-  const rowStyle = { ["--char" as string]: color };
+    // --char 変数を行ルート要素に注入する style オブジェクト。
+    // Why memo-safe: オブジェクトは毎レンダーで新参照になるが、memo の shallow 比較では
+    // style は常に異なるオブジェクトとみなされる。ただし color は string primitive なので
+    // 同じキャラが選ばれている限り color 文字列は同値 → style の変化は memo 外から来る
+    // props(line.characterId 変更)によるものだけ。LineRow の再描画は必要なので許容する。
+    const rowStyle = { ["--char" as string]: color };
 
-  const handleFocus = () => setFocused(true);
-  const handleBlur  = () => setFocused(false);
+    const handleFocus = () => setFocused(true);
+    const handleBlur = () => setFocused(false);
 
-  return (
-    <div
-      ref={ref}
-      className={focused ? `${styles.row} ${styles.focused}` : styles.row}
-      style={rowStyle}
-    >
-      {/* 行番号 — 可視テキストは index+1 */}
-      <span className={styles.num}>{index + 1}</span>
+    return (
+      <div ref={ref} className={focused ? `${styles.row} ${styles.focused}` : styles.row} style={rowStyle}>
+        {/* 行番号 — 可視テキストは index+1 */}
+        <span className={styles.num}>{index + 1}</span>
 
-      {/* ===== Character dropdown (item 4: 独自アクセシブルドロップダウン) =====
-       * CharDropdown コンポーネント: listbox パターン。
-       * open 状態は LineRow 内 local state（NF-10: 他行に波及しない）。
-       * CharDropdown 内で open 管理するため、LineRow は rowStyle を渡すだけ。
-       */}
-      <CharDropdown
-        lineId={line.id}
-        characterId={line.characterId}
-        characters={characters}
-        onCharacterChange={props.onCharacterChange}
-        rowStyle={rowStyle}
-      />
+        {/* ===== Character dropdown (item 4: 独自アクセシブルドロップダウン) =====
+         * CharDropdown コンポーネント: listbox パターン。
+         * open 状態は LineRow 内 local state（NF-10: 他行に波及しない）。
+         * CharDropdown 内で open 管理するため、LineRow は rowStyle を渡すだけ。
+         */}
+        <CharDropdown
+          lineId={line.id}
+          characterId={line.characterId}
+          characters={characters}
+          onCharacterChange={props.onCharacterChange}
+          rowStyle={rowStyle}
+        />
 
-      {/* ===== Dialogue input ===== */}
-      <input
-        className={styles.dialogue}
-        type="text"
-        aria-label="セリフ"
-        placeholder="セリフを入力…"
-        value={line.text}
-        onChange={(e: ChangeEvent<HTMLInputElement>) =>
-          props.onTextChange(line.id, e.target.value)
-        }
-        onFocus={handleFocus}
-        onBlur={handleBlur}
-      />
+        {/* ===== Dialogue input ===== */}
+        <input
+          className={styles.dialogue}
+          type="text"
+          aria-label="セリフ"
+          placeholder="セリフを入力…"
+          value={line.text}
+          onChange={(e: ChangeEvent<HTMLInputElement>) => props.onTextChange(line.id, e.target.value)}
+          onFocus={handleFocus}
+          onBlur={handleBlur}
+        />
 
-      {/* ===== Character count badge ===== */}
-      <span className={badgeClass}>{line.text.length}</span>
+        {/* ===== Character count badge ===== */}
+        <span className={badgeClass}>{line.text.length}</span>
 
-      {/* ===== Action buttons: ホバー時にスライドイン ===== */}
-      <div className={styles.actions}>
-        <button
-          className={styles.action}
-          aria-label="上に移動"
-          disabled={isFirst}
-          onClick={() => props.onMoveUp(line.id)}
-        >
-          ↑
-        </button>
-        <button
-          className={styles.action}
-          aria-label="下に移動"
-          disabled={isLast}
-          onClick={() => props.onMoveDown(line.id)}
-        >
-          ↓
-        </button>
-        <div className={styles.actionsSep} aria-hidden="true" />
-        <button
-          className={styles.action}
-          aria-label="この行をコピー"
-          onClick={() => props.onCopy(line)}
-        >
-          ⧉
-        </button>
-        <button
-          className={styles.action}
-          aria-label="直後に行を追加"
-          onClick={() => props.onAddAfter(line.id)}
-        >
-          ＋
-        </button>
-        <div className={styles.actionsSep} aria-hidden="true" />
-        {/* 削除ボタン: 赤系ホバーで破壊操作のアフォーダンスを提供する */}
-        <button
-          className={`${styles.action} ${styles.actionDel}`}
-          aria-label="この行を削除"
-          onClick={() => props.onDelete(line.id)}
-        >
-          ✕
-        </button>
+        {/* ===== Action buttons: ホバー時にスライドイン ===== */}
+        <div className={styles.actions}>
+          <button
+            className={styles.action}
+            aria-label="上に移動"
+            disabled={isFirst}
+            onClick={() => props.onMoveUp(line.id)}
+          >
+            ↑
+          </button>
+          <button
+            className={styles.action}
+            aria-label="下に移動"
+            disabled={isLast}
+            onClick={() => props.onMoveDown(line.id)}
+          >
+            ↓
+          </button>
+          <div className={styles.actionsSep} aria-hidden="true" />
+          <button className={styles.action} aria-label="この行をコピー" onClick={() => props.onCopy(line)}>
+            ⧉
+          </button>
+          <button className={styles.action} aria-label="直後に行を追加" onClick={() => props.onAddAfter(line.id)}>
+            ＋
+          </button>
+          <div className={styles.actionsSep} aria-hidden="true" />
+          {/* 削除ボタン: 赤系ホバーで破壊操作のアフォーダンスを提供する */}
+          <button
+            className={`${styles.action} ${styles.actionDel}`}
+            aria-label="この行を削除"
+            onClick={() => props.onDelete(line.id)}
+          >
+            ✕
+          </button>
+        </div>
       </div>
-    </div>
-  );
-}));
+    );
+  }),
+);

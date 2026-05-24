@@ -27,8 +27,9 @@
   display: grid;
   place-items: center;
   /* 全体の淡いフェードイン。図形を歪めないよう opacity のみ。 */
-  width: 480px;
-  height: 480px;
+  width: 640px;
+  height: 640px;
+  max-width: 92vw;
 }
 .enter .content { animation: openingFadeIn 0.4s ease-out both; }
 .idle .content { opacity: 1; }
@@ -70,7 +71,7 @@
 @keyframes ringExpand {
   0%   { width: 0; height: 0; opacity: 0; }
   12%  { opacity: 0.55; }
-  100% { width: 680px; height: 680px; opacity: 0; }
+  100% { width: 940px; height: 940px; opacity: 0; }
 }
 
 /* 回転ポリゴン: ゆっくり回りながら拡大・消滅する六角形線画 */
@@ -78,8 +79,8 @@
   position: absolute;
   top: 0;
   left: 0;
-  width: 150px;
-  height: 150px;
+  width: 210px;
+  height: 210px;
   opacity: 0;
   filter: drop-shadow(0 0 6px rgba(43, 180, 230, 0.4));
   animation: polySpin 1s ease-out forwards;
@@ -114,8 +115,8 @@
 .logo {
   position: relative;
   z-index: 2;
-  width: 400px;
-  max-width: 80vw;
+  width: 560px;
+  max-width: 88vw;
   height: auto;
   filter: drop-shadow(0 0 22px rgba(43, 180, 230, 0.4));
   /* 放射が始まった少し後に浮かび上がる */

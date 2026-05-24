@@ -60,26 +60,29 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
   // prefers-reduced-motion チェックにより reduced モードでは即時削除。
   const REMOVE_DURATION = 180; // ms — CSS animation duration と一致させる
 
-  const handleDelete = useCallback((id: string) => {
-    if (!canDelete) return;
-    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    if (reduced) {
-      onDelete(id);
-      return;
-    }
-    setRemovingIds((prev) => ({ ...prev, [id]: true }));
-    window.setTimeout(() => {
-      onDelete(id);
-      // removingIds のクリーンアップは onDelete 後に characters が更新されると
-      // そのキャラが list から消えるため、state のクリーンアップは省略可能だが
-      // 念のため実施して stale state を防ぐ。
-      setRemovingIds((prev) => {
-        const next = { ...prev };
-        delete next[id];
-        return next;
-      });
-    }, REMOVE_DURATION);
-  }, [canDelete, onDelete]);
+  const handleDelete = useCallback(
+    (id: string) => {
+      if (!canDelete) return;
+      const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+      if (reduced) {
+        onDelete(id);
+        return;
+      }
+      setRemovingIds((prev) => ({ ...prev, [id]: true }));
+      window.setTimeout(() => {
+        onDelete(id);
+        // removingIds のクリーンアップは onDelete 後に characters が更新されると
+        // そのキャラが list から消えるため、state のクリーンアップは省略可能だが
+        // 念のため実施して stale state を防ぐ。
+        setRemovingIds((prev) => {
+          const next = { ...prev };
+          delete next[id];
+          return next;
+        });
+      }, REMOVE_DURATION);
+    },
+    [canDelete, onDelete],
+  );
 
   const submit = () => {
     const trimmed = name.trim();
@@ -100,7 +103,10 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
       {/* ===== Add character form ===== */}
       <form
         className={styles.charAdd}
-        onSubmit={(e) => { e.preventDefault(); submit(); }}
+        onSubmit={(e) => {
+          e.preventDefault();
+          submit();
+        }}
       >
         {/* aria-label でスクリーンリーダーと getByRole テストから取得可能にする
             （placeholder は視覚的ヒントとして残す）。 */}
@@ -112,7 +118,9 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
           onChange={(e: ChangeEvent<HTMLInputElement>) => setName(e.target.value)}
         />
         {/* アイコンにしても aria-label="追加" でアクセシブル名を保証する */}
-        <button type="submit" className={styles.addBtn} aria-label="追加">+</button>
+        <button type="submit" className={styles.addBtn} aria-label="追加">
+          +
+        </button>
       </form>
 
       {/* ===== Character list ===== */}

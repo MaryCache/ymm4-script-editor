@@ -11,9 +11,18 @@ const characters: Character[] = [
 const line: Line = { id: "l1", characterId: "c1", text: "やあ" };
 const noop = () => {};
 const baseProps = {
-  line, characters, index: 0, isFirst: true, isLast: false,
-  onCharacterChange: noop, onTextChange: noop, onMoveUp: noop,
-  onMoveDown: noop, onAddAfter: noop, onDelete: noop, onCopy: noop,
+  line,
+  characters,
+  index: 0,
+  isFirst: true,
+  isLast: false,
+  onCharacterChange: noop,
+  onTextChange: noop,
+  onMoveUp: noop,
+  onMoveDown: noop,
+  onAddAfter: noop,
+  onDelete: noop,
+  onCopy: noop,
 };
 
 test("行番号・セリフ・文字数を表示", () => {

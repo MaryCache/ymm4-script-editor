@@ -83,7 +83,11 @@ test("不正な .ymscript を読み込んでも状態は変わらない（design
   const { result } = renderHook(() => useProject());
   act(() => result.current.setProjectName("元の名前"));
   const badFile = new File(["{ not valid json"], "broken.ymscript", { type: "application/json" });
-  await expect(act(async () => { await result.current.loadFromFile(badFile); })).rejects.toThrow();
+  await expect(
+    act(async () => {
+      await result.current.loadFromFile(badFile);
+    }),
+  ).rejects.toThrow();
   expect(result.current.project.projectName).toBe("元の名前");
 });
 
@@ -91,7 +95,9 @@ test("importMarkdown はファイルから状態を置き換え、skippedLines �
   const { result } = renderHook(() => useProject());
   const md = new File(["霊夢: やあ\n不正行\n魔理沙: どうも"], "x.md", { type: "text/markdown" });
   let skipped = -1;
-  await act(async () => { skipped = await result.current.importMarkdown(md); });
+  await act(async () => {
+    skipped = await result.current.importMarkdown(md);
+  });
   expect(skipped).toBe(1);
   expect(result.current.project.lines.map((l) => l.text)).toEqual(["やあ", "どうも"]);
 });
@@ -103,7 +109,9 @@ test("exportCSVToClipboard は全件 CSV をクリップボードへ書く", asy
   act(() => result.current.addCharacter("霊夢"));
   act(() => result.current.addLineAtEnd());
   act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "やあ"));
-  await act(async () => { await result.current.exportCSVToClipboard(); });
+  await act(async () => {
+    await result.current.exportCSVToClipboard();
+  });
   expect(writeText).toHaveBeenCalledWith("霊夢,やあ");
 });
 
@@ -116,7 +124,11 @@ test("version:2 の .ymscript は loadFromFile が reject し状態は変わら�
     "future.ymscript",
     { type: "application/json" },
   );
-  await expect(act(async () => { await result.current.loadFromFile(badFile); })).rejects.toThrow();
+  await expect(
+    act(async () => {
+      await result.current.loadFromFile(badFile);
+    }),
+  ).rejects.toThrow();
   expect(result.current.project.projectName).toBe("元の名前");
 });
 
@@ -150,13 +162,11 @@ test("フロントマターあり Markdown を importMarkdown で読み込める
     "---",
   ].join("\n");
   const body = "霊夢: こんにちは\n魔理沙: どうも";
-  const md = new File(
-    [`${frontmatter}\n${body}`],
-    "with-frontmatter.md",
-    { type: "text/markdown" },
-  );
+  const md = new File([`${frontmatter}\n${body}`], "with-frontmatter.md", { type: "text/markdown" });
   let skipped = -1;
-  await act(async () => { skipped = await result.current.importMarkdown(md); });
+  await act(async () => {
+    skipped = await result.current.importMarkdown(md);
+  });
   // projectName がフロントマターから読み込まれていること
   expect(result.current.project.projectName).toBe("テスト台本");
   // 本文の2行が読み込まれていること

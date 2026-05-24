@@ -2,7 +2,8 @@ import { parseProjectFile, sanitizeFilename } from "./file";
 import type { Project } from "../types";
 
 const valid: Project = {
-  version: 1, projectName: "P",
+  version: 1,
+  projectName: "P",
   characters: [{ id: "c1", name: "霊夢", color: "#FF6B6B" }],
   lines: [{ id: "l1", characterId: "c1", text: "やあ" }],
 };

@@ -6,8 +6,7 @@ import type { Character, Line, Project } from "../types";
 // （この変換は非可逆）。
 // 読点「、」(U+3001) はユーザーの表記であり CSV の列区切りにはならないため変換しない。
 // 名前列も同じ列ズレリスクがあるため escapeText を適用する。
-const escapeText = (text: string): string =>
-  text.replace(/\r\n|\r|\n/g, " ").replace(/,/g, "，");
+const escapeText = (text: string): string => text.replace(/\r\n|\r|\n/g, " ").replace(/,/g, "，");
 
 /**
  * 1行のセリフを YMM4 向け CSV 行文字列（`名前,テキスト`）に変換する。

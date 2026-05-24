@@ -14,8 +14,16 @@
  * @see {@link colorForIndex}
  */
 export const PALETTE = [
-  "#FF6B6B", "#FFB347", "#87CEEB", "#A0E7A0", "#C792EA",
-  "#FFD166", "#6BCB77", "#4D96FF", "#FF9A8B", "#B388EB",
+  "#FF6B6B",
+  "#FFB347",
+  "#87CEEB",
+  "#A0E7A0",
+  "#C792EA",
+  "#FFD166",
+  "#6BCB77",
+  "#4D96FF",
+  "#FF9A8B",
+  "#B388EB",
 ] as const;
 
 /**

@@ -12,10 +12,17 @@ test("簡易形式: 本文からキャラを自動登録", () => {
 
 test("完全形式: フロントマターの色定義を優先", () => {
   const md = [
-    "---", "project: 第1回解説", "characters:",
-    "  - name: 霊夢", '    color: "#FF6B6B"',
-    "  - name: 魔理沙", '    color: "#FFB347"',
-    "---", "", "霊夢: やあ", "魔理沙: どうも",
+    "---",
+    "project: 第1回解説",
+    "characters:",
+    "  - name: 霊夢",
+    '    color: "#FF6B6B"',
+    "  - name: 魔理沙",
+    '    color: "#FFB347"',
+    "---",
+    "",
+    "霊夢: やあ",
+    "魔理沙: どうも",
   ].join("\n");
   const { project } = parseMarkdown(md);
   expect(project.projectName).toBe("第1回解説");
@@ -25,8 +32,14 @@ test("完全形式: フロントマターの色定義を優先", () => {
 
 test("フロントマター未定義のキャラが本文に出たら自動追加", () => {
   const md = [
-    "---", "project: P", "characters:", "  - name: 霊夢", '    color: "#FF6B6B"', "---",
-    "霊夢: やあ", "ナレーター: 補足です",
+    "---",
+    "project: P",
+    "characters:",
+    "  - name: 霊夢",
+    '    color: "#FF6B6B"',
+    "---",
+    "霊夢: やあ",
+    "ナレーター: 補足です",
   ].join("\n");
   const { project } = parseMarkdown(md);
   expect(project.characters.map((c) => c.name)).toEqual(["霊夢", "ナレーター"]);
@@ -34,7 +47,7 @@ test("フロントマター未定義のキャラが本文に出たら自動追�
 
 test("空行と # 行は無視、: スペース区切りでない行はスキップ数に計上", () => {
   const { project, skippedLines } = parseMarkdown(
-    "# 見出し\n\n霊夢: あ\nコロンなしの不正行\n魔理沙:行末コロンのみ\n魔理沙: い"
+    "# 見出し\n\n霊夢: あ\nコロンなしの不正行\n魔理沙:行末コロンのみ\n魔理沙: い",
   );
   expect(project.lines.map((l) => l.text)).toEqual(["あ", "い"]);
   expect(skippedLines).toBe(2); // 「コロンなし」「行末コロンのみ（: スペースでない）」
@@ -77,7 +90,8 @@ test("buildMarkdown の projectName に改行が含まれてもフロントマ�
 
 test("buildMarkdown は完全形式で round-trip できる（色は保持）", () => {
   const original: Project = {
-    version: 1, projectName: "P",
+    version: 1,
+    projectName: "P",
     characters: [
       { id: "c1", name: "霊夢", color: "#FF6B6B" },
       { id: "c2", name: "魔理沙", color: "#FFB347" },
@@ -91,7 +105,8 @@ test("buildMarkdown は完全形式で round-trip できる（色は保持）", 
   const { project: restored } = parseMarkdown(md);
   expect(restored.projectName).toBe("P");
   expect(restored.characters.map((c) => [c.name, c.color])).toEqual([
-    ["霊夢", "#FF6B6B"], ["魔理沙", "#FFB347"],
+    ["霊夢", "#FF6B6B"],
+    ["魔理沙", "#FFB347"],
   ]);
   expect(restored.lines.map((l) => l.text)).toEqual(["やあ", "どうも"]);
   // ID は保持されない（新規採番）

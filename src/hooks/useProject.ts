@@ -50,7 +50,7 @@ export type UseProjectReturn = {
    *
    * @param id - 削除対象のキャラクター ID
    */
-  deleteCharacter: (id: string) => void;          // 最後の1キャラは no-op
+  deleteCharacter: (id: string) => void; // 最後の1キャラは no-op
   /**
    * 指定 ID の行の直後に新しい行を挿入する。
    *
@@ -105,7 +105,7 @@ export type UseProjectReturn = {
    * @remarks
    * ファイル名は `sanitizeFilename(project.projectName) + ".ymscript"`。
    */
-  saveToFile: () => void;                          // .ymscript
+  saveToFile: () => void; // .ymscript
   /**
    * `.ymscript` ファイルを読み込んでプロジェクトを復元する。
    *
@@ -119,21 +119,21 @@ export type UseProjectReturn = {
    * @remarks
    * Excel / YMM4 での文字化けを防ぐため UTF-8 BOM を付与する（要件 F-51）。
    */
-  exportCSV: () => void;                           // BOM付き .csv
+  exportCSV: () => void; // BOM付き .csv
   /**
    * プロジェクトを Markdown ファイルとしてダウンロードする。
    *
    * @remarks
    * YAML フロントマター付きの完全形式。`parseMarkdown` で round-trip できる。
    */
-  exportMarkdown: () => void;                       // 完全形式 .md
+  exportMarkdown: () => void; // 完全形式 .md
   /**
    * Markdown ファイルを読み込んでプロジェクトを更新する。
    *
    * @param file - ユーザーが選択した `.md` ファイル
    * @returns スキップした行数（パースできなかった行の件数）
    */
-  importMarkdown: (file: File) => Promise<number>;  // 返り値: skippedLines
+  importMarkdown: (file: File) => Promise<number>; // 返り値: skippedLines
   /**
    * プロジェクト全行の CSV テキストをクリップボードにコピーする（要件 F-51）。
    *
@@ -141,7 +141,7 @@ export type UseProjectReturn = {
    * BOM なしの CSV テキストをコピーする（ペースト先が BOM を扱えないケースを考慮）。
    * Clipboard API が利用できない場合は reject する。
    */
-  exportCSVToClipboard: () => Promise<void>;        // 全件コピー（F-51）
+  exportCSVToClipboard: () => Promise<void>; // 全件コピー（F-51）
 };
 
 // 関数にする理由: 毎回新しいオブジェクトを返し、複数の呼び出し元が参照を共有しないようにするため。
@@ -205,76 +205,99 @@ export const useProject = (): UseProjectReturn => {
 
   const setProjectName = useCallback((name: string) => setProject((p) => ({ ...p, projectName: name })), []);
 
-  const addCharacter = useCallback((name: string) =>
-    setProject((p) => ({
-      ...p,
-      characters: [...p.characters, { id: generateId(), name, color: colorForIndex(p.characters.length) }],
-    })), []);
+  const addCharacter = useCallback(
+    (name: string) =>
+      setProject((p) => ({
+        ...p,
+        characters: [...p.characters, { id: generateId(), name, color: colorForIndex(p.characters.length) }],
+      })),
+    [],
+  );
 
   // 最後の1キャラを削除しない理由: キャラが0になると全 Line が孤児になり
   // select が空になって UI が壊れる。ガードで不変を保つ。
   // fallback は「削除対象でない最初のキャラ」。該当 Line を付け替えることで孤児を作らない（F-04）。
-  const deleteCharacter = useCallback((id: string) =>
-    setProject((p) => {
-      if (p.characters.length <= 1) return p; // 最後の1キャラは削除不可
-      const fallbackId = p.characters.find((c) => c.id !== id)?.id ?? "";
-      return {
-        ...p,
-        characters: p.characters.filter((c) => c.id !== id),
-        lines: p.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
-      };
-    }), []);
+  const deleteCharacter = useCallback(
+    (id: string) =>
+      setProject((p) => {
+        if (p.characters.length <= 1) return p; // 最後の1キャラは削除不可
+        const fallbackId = p.characters.find((c) => c.id !== id)?.id ?? "";
+        return {
+          ...p,
+          characters: p.characters.filter((c) => c.id !== id),
+          lines: p.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
+        };
+      }),
+    [],
+  );
 
   // 文脈がないため先頭キャラを割り当てる。
-  const addLineAtEnd = useCallback(() =>
-    setProject((p) => {
-      const first = p.characters[0];
-      if (!first) return p; // キャラ未登録なら no-op
-      return { ...p, lines: [...p.lines, newLine(first.id)] };
-    }), []);
+  const addLineAtEnd = useCallback(
+    () =>
+      setProject((p) => {
+        const first = p.characters[0];
+        if (!first) return p; // キャラ未登録なら no-op
+        return { ...p, lines: [...p.lines, newLine(first.id)] };
+      }),
+    [],
+  );
 
   // 直後に追加する行は元の行のキャラを引き継ぐ（同一話者の連続入力が自然なため）。
   // 末尾追加 addLineAtEnd は文脈がないので先頭キャラを使う。
   // afterId の行が見つからない・登録キャラがいない場合のフォールバックは先頭キャラ。
   // splice はローカルコピーに対してのみ使用。元の p.lines は変更しない（イミュータブル）。
-  const addLineAfter = useCallback((afterId: string) =>
-    setProject((p) => {
-      const first = p.characters[0];
-      if (!first) return p; // キャラ未登録なら no-op
-      const idx = p.lines.findIndex((l) => l.id === afterId);
-      if (idx === -1) return p;
-      const sourceLine = p.lines[idx];
-      const inheritedCharId = p.characters.some((c) => c.id === sourceLine?.characterId)
-        ? (sourceLine?.characterId ?? first.id)
-        : first.id;
-      const next = [...p.lines];
-      next.splice(idx + 1, 0, newLine(inheritedCharId));
-      return { ...p, lines: next };
-    }), []);
+  const addLineAfter = useCallback(
+    (afterId: string) =>
+      setProject((p) => {
+        const first = p.characters[0];
+        if (!first) return p; // キャラ未登録なら no-op
+        const idx = p.lines.findIndex((l) => l.id === afterId);
+        if (idx === -1) return p;
+        const sourceLine = p.lines[idx];
+        const inheritedCharId = p.characters.some((c) => c.id === sourceLine?.characterId)
+          ? (sourceLine?.characterId ?? first.id)
+          : first.id;
+        const next = [...p.lines];
+        next.splice(idx + 1, 0, newLine(inheritedCharId));
+        return { ...p, lines: next };
+      }),
+    [],
+  );
 
-  const deleteLine = useCallback((id: string) =>
-    setProject((p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id) })), []);
+  const deleteLine = useCallback(
+    (id: string) => setProject((p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id) })),
+    [],
+  );
 
-  const updateLineCharacter = useCallback((lineId: string, characterId: string) =>
-    setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, characterId } : l)) })), []);
+  const updateLineCharacter = useCallback(
+    (lineId: string, characterId: string) =>
+      setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, characterId } : l)) })),
+    [],
+  );
 
-  const updateLineText = useCallback((lineId: string, text: string) =>
-    setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, text } : l)) })), []);
+  const updateLineText = useCallback(
+    (lineId: string, text: string) =>
+      setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, text } : l)) })),
+    [],
+  );
 
-  const moveLine = useCallback((id: string, direction: "up" | "down") =>
-    setProject((p) => {
-      const idx = p.lines.findIndex((l) => l.id === id);
-      if (idx === -1) return p;
-      const target = direction === "up" ? idx - 1 : idx + 1;
-      if (target < 0 || target >= p.lines.length) return p;
-      const next = [...p.lines];
-      // 範囲チェック済みのためどちらも必ず存在する。一時変数で swap を明示する。
-      const lineAtIdx = next[idx]!;
-      const lineAtTarget = next[target]!;
-      next[idx] = lineAtTarget;
-      next[target] = lineAtIdx;
-      return { ...p, lines: next };
-    }), []);
+  const moveLine = useCallback(
+    (id: string, direction: "up" | "down") =>
+      setProject((p) => {
+        const idx = p.lines.findIndex((l) => l.id === id);
+        if (idx === -1) return p;
+        const target = direction === "up" ? idx - 1 : idx + 1;
+        if (target < 0 || target >= p.lines.length) return p;
+        const next = [...p.lines];
+        // 範囲チェック済みのためどちらも必ず存在する。一時変数で swap を明示する。
+        const lineAtIdx = next[idx]!;
+        const lineAtTarget = next[target]!;
+        next[idx] = lineAtTarget;
+        next[target] = lineAtIdx;
+        return { ...p, lines: next };
+      }),
+    [],
+  );
 
   // --- [project] 依存: saveToFile / exportCSV / exportMarkdown / exportCSVToClipboard ---
   // これらは project の現在値を関数実行時に読むため、updater 形式が使えず [project] 依存。
@@ -316,9 +339,21 @@ export const useProject = (): UseProjectReturn => {
   }, [project]);
 
   return {
-    project, setProjectName, addCharacter, deleteCharacter,
-    addLineAfter, addLineAtEnd, deleteLine, updateLineCharacter,
-    updateLineText, moveLine, saveToFile, loadFromFile,
-    exportCSV, exportMarkdown, importMarkdown, exportCSVToClipboard,
+    project,
+    setProjectName,
+    addCharacter,
+    deleteCharacter,
+    addLineAfter,
+    addLineAtEnd,
+    deleteLine,
+    updateLineCharacter,
+    updateLineText,
+    moveLine,
+    saveToFile,
+    loadFromFile,
+    exportCSV,
+    exportMarkdown,
+    importMarkdown,
+    exportCSVToClipboard,
   };
 };

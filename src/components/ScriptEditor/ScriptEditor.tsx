@@ -148,7 +148,9 @@ function useFLIP(signature: string) {
       }
       // 上記の style 変更を確定させるために getBoundingClientRect を呼ぶ（強制 layout flush）。
       // これにより以降の測定は確定位置（アニメーション前の座標）を返す。
-      rowRefs.current.forEach((el) => { el.getBoundingClientRect(); });
+      rowRefs.current.forEach((el) => {
+        el.getBoundingClientRect();
+      });
       // transition を元の値に戻す
       for (const entry of els) {
         entry.el.style.transition = entry.prevTransition;
@@ -186,9 +188,7 @@ function useFLIP(signature: string) {
       const dy = prevRect.top - currentRect.top;
       if (Math.abs(dy) < 1) continue; // 実質移動なし → スキップ
 
-      const el = id === "__addRow__"
-        ? addRowRef.current
-        : rowRefs.current.get(id);
+      const el = id === "__addRow__" ? addRowRef.current : rowRefs.current.get(id);
       if (!el) continue;
 
       // Invert: 旧位置に見せかける（transition なしで瞬時に）
@@ -203,7 +203,9 @@ function useFLIP(signature: string) {
       // requestAnimationFrame で「Invert の paint が完了した次フレーム」を狙う。
       const rafId = requestAnimationFrame(() => {
         for (const { el, prevTransition } of animated) {
-          el.style.transition = `transform ${FLIP_DURATION}ms var(--ease-out), ${prevTransition || ""}`.trim().replace(/,\s*$/, "");
+          el.style.transition = `transform ${FLIP_DURATION}ms var(--ease-out), ${prevTransition || ""}`
+            .trim()
+            .replace(/,\s*$/, "");
           el.style.transform = "";
         }
         // アニメーション完了後に transition をクリーンアップ
@@ -256,7 +258,7 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
     setCanScrollUp(scrollTop > 8);
     // scroll-to-top-toggle: scrollTop が clientHeight を超えたら表示
     setShowScrollToTop(scrollTop > (clientHeight || 8));
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // linesRef は useRef 由来で不変 — deps に含めない
 
   useEffect(() => {
@@ -344,7 +346,12 @@ export function ScriptEditor(props: ScriptEditorProps) {
           </div>
           {/* イコライザ波形 — 純粋装飾。aria-hidden で AT に読ませない。 */}
           <div className={styles.waveform} aria-hidden="true">
-            <span /><span /><span /><span /><span /><span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
+            <span />
           </div>
         </div>
       </div>
@@ -399,7 +406,9 @@ export function ScriptEditor(props: ScriptEditorProps) {
               onClick={props.onAddLine}
               aria-label="+ 行を追加"
             >
-              <span className={styles.plus} aria-hidden="true">+</span>
+              <span className={styles.plus} aria-hidden="true">
+                +
+              </span>
               行を追加
             </button>
           </div>

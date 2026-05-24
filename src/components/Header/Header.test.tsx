@@ -9,8 +9,12 @@ import { Header } from "./Header";
 const baseProps = {
   projectName: "テスト台本",
   onProjectNameChange: () => {},
-  onSaveYmscript: () => {}, onSaveMarkdown: () => {}, onExportCSV: () => {},
-  onLoadYmscript: () => {}, onLoadMarkdown: () => {}, onCopyAll: () => {},
+  onSaveYmscript: () => {},
+  onSaveMarkdown: () => {},
+  onExportCSV: () => {},
+  onLoadYmscript: () => {},
+  onLoadMarkdown: () => {},
+  onCopyAll: () => {},
 };
 
 test("プロジェクト名が編集欄に表示される", () => {

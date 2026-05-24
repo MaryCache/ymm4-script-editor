@@ -100,12 +100,18 @@ export const readFileAsText = (file: File): Promise<string> =>
 const isString = (v: unknown): v is string => typeof v === "string";
 
 const isCharacter = (v: unknown): v is Character =>
-  typeof v === "object" && v !== null &&
-  isString((v as Character).id) && isString((v as Character).name) && isString((v as Character).color);
+  typeof v === "object" &&
+  v !== null &&
+  isString((v as Character).id) &&
+  isString((v as Character).name) &&
+  isString((v as Character).color);
 
 const isLine = (v: unknown): v is Line =>
-  typeof v === "object" && v !== null &&
-  isString((v as Line).id) && isString((v as Line).characterId) && isString((v as Line).text);
+  typeof v === "object" &&
+  v !== null &&
+  isString((v as Line).id) &&
+  isString((v as Line).characterId) &&
+  isString((v as Line).text);
 
 /**
  * 未知の JSON 値をプロジェクトデータとして検証し、型安全な `Project` を返す。

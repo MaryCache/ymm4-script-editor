@@ -10,8 +10,13 @@ const lines: Line[] = [
   { id: "l2", characterId: "c1", text: "かき" },
 ];
 const handlers = {
-  onCharacterChange: () => {}, onTextChange: () => {}, onMoveUp: () => {},
-  onMoveDown: () => {}, onAddAfter: () => {}, onDelete: () => {}, onCopy: () => {},
+  onCharacterChange: () => {},
+  onTextChange: () => {},
+  onMoveUp: () => {},
+  onMoveDown: () => {},
+  onAddAfter: () => {},
+  onDelete: () => {},
+  onCopy: () => {},
 };
 
 test("合計文字数を表示（3+2=5）", () => {
