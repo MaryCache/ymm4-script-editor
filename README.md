@@ -1,73 +1,103 @@
-# React + TypeScript + Vite
+# YMM4台本エディタ
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+YukkuriMovieMaker4（YMM4）向けの解説・ゆっくり動画の**台本（キャラクター × セリフ）を編集し、CSV / `.ymscript` / Markdown で入出力する**ブラウザ完結の PWA です。バックエンドなし・外部通信なしで動作し、デスクトップアプリとしてインストールできます。
 
-Currently, two official plugins are available:
+🌐 **公開版: https://marycache.github.io/ymm4-script-editor/**
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+---
 
-## React Compiler
+## 特長
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+- **キャラクター管理** — 名前で登録し識別色を自動付与。削除時は該当セリフを先頭キャラへ自動付け替え（最後の1人は誤削除防止のため削除不可）。
+- **台本編集** — セリフ行の追加（末尾／特定行の直後）・削除・上下入れ替え・キャラ割り当て。各行の文字数と台本全体の合計文字数をリアルタイム表示。
+- **コピー／書き出し**
+  - 1行コピー（`キャラクター名,セリフ` 形式）／全件コピー
+  - **CSV**（UTF-8 BOM 付き、YMM4 読み込み向け。セリフ内コンマは全角化、改行は畳む）
+  - **`.ymscript`**（プロジェクトの保存／復元用 JSON）
+  - **Markdown**（フロントマター付き完全形式の入出力。AI に台本生成を依頼 → そのまま読み込む用途に対応）
+- **自動保存** — 編集内容を localStorage に自動保存し、次回起動時に復元。
+- **PWA** — オフライン動作・デスクトップインストール対応。インストール時は Window Controls Overlay でネイティブウィンドウ風の外観に。
+- **動作演出** — 起動オープニング、行入れ替えの FLIP アニメ、独自スタイルのキャラ選択ドロップダウン、スクロール促し／一番上に戻る、背景モーションなど。すべて `prefers-reduced-motion` を尊重。
 
-## Expanding the ESLint configuration
+---
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+## 技術スタック
 
-```js
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
+| 領域 | 採用 |
+|---|---|
+| ビルド | Vite |
+| UI | React 19 + TypeScript（strict / `noUncheckedIndexedAccess` / `verbatimModuleSyntax`） |
+| スタイル | Plain CSS + CSS Modules（外部 UI/フォント依存なし） |
+| PWA | vite-plugin-pwa（Workbox） |
+| 永続化 | localStorage + File API |
+| テスト | Vitest + @testing-library（jsdom） |
 
-      // Remove tseslint.configs.recommended and replace with this
-      tseslint.configs.recommendedTypeChecked,
-      // Alternatively, use this for stricter rules
-      tseslint.configs.strictTypeChecked,
-      // Optionally, add this for stylistic rules
-      tseslint.configs.stylisticTypeChecked,
+設計方針: 状態は `src/hooks/useProject.ts` に集約、`src/utils/*` は副作用のない純関数、`src/components/*` は表示のみ。
 
-      // Other configs...
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+---
+
+## 開発
+
+```bash
+npm install
+npm run dev       # 開発サーバ（HMR）
+npm test          # テスト（Vitest）
+npm run lint      # ESLint
+npm run build     # 型チェック + 本番ビルド（dist/）
+npm run preview   # ビルド成果物をローカル配信
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+> 主要ターゲットは最新版の Chrome / Edge デスクトップです（モバイルは対象外）。
+> PWA インストール・Window Controls Overlay・クリップボードは HTTPS（または localhost）でのみ有効です。
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+---
 
-export default defineConfig([
-  globalIgnores(['dist']),
-  {
-    files: ['**/*.{ts,tsx}'],
-    extends: [
-      // Other configs...
-      // Enable lint rules for React
-      reactX.configs['recommended-typescript'],
-      // Enable lint rules for React DOM
-      reactDom.configs.recommended,
-    ],
-    languageOptions: {
-      parserOptions: {
-        project: ['./tsconfig.node.json', './tsconfig.app.json'],
-        tsconfigRootDir: import.meta.dirname,
-      },
-      // other options...
-    },
-  },
-])
+## データ形式
+
+### `.ymscript`（プロジェクト保存形式 / JSON）
+
+```json
+{
+  "version": 1,
+  "projectName": "第1回解説",
+  "characters": [{ "id": "…", "name": "霊夢", "color": "#FF6B6B" }],
+  "lines": [{ "id": "…", "characterId": "…", "text": "今日は解説するわ" }]
+}
 ```
+
+### CSV（YMM4 取り込み用）
+
+ヘッダーなし・1行1セリフ・`キャラクター名,セリフ` 形式・UTF-8 **BOM 付き**。
+
+```
+霊夢,今日はCSVの使い方を解説するわ！
+魔理沙,しっかり覚えろよ！
+```
+
+### Markdown（AI 連携・人間が書く用）
+
+```markdown
+---
+project: 第1回解説
+characters:
+  - name: 霊夢
+    color: "#FF6B6B"
+---
+
+霊夢: 今日はYMM4の使い方を解説するわよ！
+魔理沙: しっかり覚えろよな！
+```
+
+フロントマターは省略可（省略時は本文の `名前: セリフ` から自動でキャラ登録）。読み込みは現在のプロジェクトを置き換えます。
+
+---
+
+## デプロイ
+
+`main` への push で GitHub Actions（`.github/workflows/deploy.yml`）が `npm run build` を実行し、GitHub Pages へ自動デプロイします。GitHub Pages のサブパス配信に合わせて Vite の `base` を `/ymm4-script-editor/` に設定しています（ルート配信のホストに移す場合は `base` を `/` に戻してください）。
+
+---
+
+## ライセンス
+
+未設定（個人ツール）。再利用・公開ルールを定めたい場合は `LICENSE` を追加してください。
