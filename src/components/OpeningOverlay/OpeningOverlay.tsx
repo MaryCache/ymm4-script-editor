@@ -111,9 +111,8 @@ export function OpeningOverlay() {
       aria-hidden="true"
     >
       <div className={styles.content} ref={contentRef}>
-        {/* エンブレム（放射光つき吹き出し）とタイトルロゴはユーザー提供の透過 PNG。
-            overlay 全体が aria-hidden のため画像は装飾扱い（alt は実質無視される）。 */}
-        <img className={styles.emblem} src="/opening-emblem.png" alt="" width={180} height={180} />
+        {/* タイトルロゴのみ（ユーザー要望でエンブレムは外した）。
+            overlay 全体が aria-hidden のため画像は装飾扱い。 */}
         <img className={styles.logo} src="/opening-logo.png" alt="YMM4台本エディタ" />
       </div>
     </div>

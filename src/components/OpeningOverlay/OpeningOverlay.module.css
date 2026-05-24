@@ -36,22 +36,13 @@
   transform-origin: center;
 }
 
-/* ===== エンブレム画像（放射光つき吹き出し） ===== */
-.emblem {
-  width: 180px;
-  height: 180px;
-  /* 暗い空間に浮かぶよう、画像のシアンに合わせた柔らかいグローを付与 */
-  filter: drop-shadow(0 0 18px rgba(43, 180, 230, 0.45));
-}
-
-/* ===== タイトルロゴ画像 ===== */
+/* ===== タイトルロゴ画像（OP はこれ単体） ===== */
 .logo {
-  width: 300px;
-  max-width: 72vw;
+  width: 400px;
+  max-width: 80vw;
   height: auto;
-  filter: drop-shadow(0 0 10px rgba(43, 180, 230, 0.3));
-  /* エンブレムとの間隔は .content の gap(16px) で確保 */
-  margin-top: -4px;
+  /* 暗い空間に浮かぶよう、画像のシアンに合わせた柔らかいグローを付与 */
+  filter: drop-shadow(0 0 22px rgba(43, 180, 230, 0.4));
 }
 
 /* ===== opening-fade-in (enter フェーズ) ===== */
