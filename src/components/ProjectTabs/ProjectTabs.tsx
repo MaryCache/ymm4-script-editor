@@ -127,9 +127,11 @@ export function ProjectTabs({ tabs, activeId, onSwitch, onNew, onClose, onRename
     }
   }, []);
 
-  // ===== 矢印キーナビゲーション（ARIA tablist パターン）=====
+  // ===== 矢印キーナビゲーション + Delete キー閉じ（ARIA tablist パターン）=====
+  // Delete（または Backspace）キーでフォーカス中のタブを閉じる。
+  // タブが1つだけ（isSingle）のときは何もしない。
   const handleTabKeyDown = useCallback(
-    (e: KeyboardEvent<HTMLButtonElement>, currentIdx: number) => {
+    (e: KeyboardEvent<HTMLButtonElement>, tab: TabEntry, currentIdx: number) => {
       if (e.key === "ArrowRight") {
         e.preventDefault();
         const nextIdx = (currentIdx + 1) % tabs.length;
@@ -140,9 +142,13 @@ export function ProjectTabs({ tabs, activeId, onSwitch, onNew, onClose, onRename
         const prevIdx = (currentIdx - 1 + tabs.length) % tabs.length;
         const prevId = tabs[prevIdx]?.id;
         if (prevId) onSwitch(prevId);
+      } else if ((e.key === "Delete" || e.key === "Backspace") && !isSingle) {
+        // フォーカス中のタブを閉じる（タブが1つだけのときは no-op）。
+        e.preventDefault();
+        onClose(tab.id);
       }
     },
-    [tabs, onSwitch],
+    [tabs, onSwitch, onClose, isSingle],
   );
 
   // タブリストのスクロールコンテナへの ref（任意: ホイール横スクロール対応）
@@ -162,56 +168,61 @@ export function ProjectTabs({ tabs, activeId, onSwitch, onNew, onClose, onRename
                 key={tab.id}
                 className={`${styles.tabItem} ${isActive ? styles.tabItemActive : ""} ${styles.tabItemEnter}`}
               >
-                {/* タブ本体ボタン（切替 + 矢印キーナビ）。
-                 *  isEditing 時は pointer-events: none にして input が全面を取る。
-                 *  role="tab" / aria-selected でスクリーンリーダーに状態を伝える。
-                 */}
-                <button
-                  ref={isActive ? activeTabRef : null}
-                  role="tab"
-                  aria-selected={isActive}
-                  tabIndex={isActive ? 0 : -1}
-                  className={styles.tabBtn}
-                  onClick={() => {
-                    if (!isEditing) onSwitch(tab.id);
-                  }}
-                  onKeyDown={(e) => handleTabKeyDown(e, idx)}
-                  title={tab.name}
-                >
-                  {isEditing ? (
-                    /* インライン編集中: input を表示 */
-                    <input
-                      className={styles.tabNameInput}
-                      aria-label="プロジェクト名を編集"
-                      value={editValue}
-                      autoFocus
-                      onFocus={(e) => e.currentTarget.select()}
-                      onChange={(e) => setEditValue(e.target.value)}
-                      onBlur={() => commitEdit(tab.id, editValue)}
-                      onKeyDown={(e) => {
-                        // Enter/Esc はフォーカスをタブ内に閉じる（stopPropagation で tabBtn の onKeyDown と競合しない）
-                        e.stopPropagation();
-                        handleEditKeyDown(e, tab.id);
-                      }}
-                    />
-                  ) : (
-                    /* 通常表示: ダブルクリックで編集モードへ */
+                {isEditing ? (
+                  /* インライン編集中: button を描画せず input を li 直下に置く。
+                   * <input> を <button role="tab"> の子にすると
+                   * インタラクティブ要素のネストになり不正（ARIA 仕様違反）なため、
+                   * 編集中は button の代わりに input を直接 tabItem 内に描画する。
+                   * 編集完了（Enter/blur）または Esc で通常表示に戻る。
+                   */
+                  <input
+                    className={styles.tabNameInput}
+                    aria-label="プロジェクト名を編集"
+                    value={editValue}
+                    autoFocus
+                    onFocus={(e) => e.currentTarget.select()}
+                    onChange={(e) => setEditValue(e.target.value)}
+                    onBlur={() => commitEdit(tab.id, editValue)}
+                    onKeyDown={(e) => handleEditKeyDown(e, tab.id)}
+                  />
+                ) : (
+                  /* 通常表示: タブ本体ボタン（切替 + 矢印/Delete キーナビ）。
+                   * role="tab" / aria-selected でスクリーンリーダーに状態を伝える。
+                   * onClick の if(!isEditing) ガードと input 側 stopPropagation の代わりに、
+                   * 編集時は button 自体を描画しないことで競合を根本回避。
+                   */
+                  <button
+                    ref={isActive ? activeTabRef : null}
+                    role="tab"
+                    aria-selected={isActive}
+                    tabIndex={isActive ? 0 : -1}
+                    className={styles.tabBtn}
+                    onClick={() => onSwitch(tab.id)}
+                    onKeyDown={(e) => handleTabKeyDown(e, tab, idx)}
+                    title={tab.name}
+                  >
+                    {/* ダブルクリックで編集モードへ。
+                     *  span に title を付けない: button の title={tab.name} が
+                     *  長名のホバー表示（フルネーム tooltip）を担うため、
+                     *  span に別の title を重ねると上書きされてしまう（#5 修正）。
+                     */}
                     <span
                       className={styles.tabName}
                       onDoubleClick={(e) => {
                         e.stopPropagation();
                         startEdit(tab.id, tab.name);
                       }}
-                      title="ダブルクリックでプロジェクト名を編集"
                     >
                       {tab.name}
                     </span>
-                  )}
-                </button>
+                  </button>
+                )}
 
                 {/* × 閉じボタン。
-                 *  最後の1タブでは disabled + aria-hidden（見せない）。
-                 *  タブ切替と競合しないよう stopPropagation。
+                 *  最後の1タブでは disabled かつ visibility:hidden で非表示にする
+                 *  （visibility:hidden はレイアウトを保ちつつアクセシビリティツリーからも除外される）。
+                 *  tabIndex=-1 で Tab フォーカスは当たらない。Delete キーでの閉じは
+                 *  タブ本体ボタンの handleTabKeyDown が担う（上記参照）。
                  */}
                 <button
                   type="button"

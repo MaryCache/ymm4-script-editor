@@ -43,6 +43,23 @@ const MARQUEE_TEXT = "YMM4 ▸ SCRIPT ▸ EDITOR ▸ YMM4台本エディタ ▸ 
  * - `ToastViewport` が body 直下 (createPortal) に描画する。
  */
 export default function App() {
+  // ===== トースト通知 =====
+  // pushToast を useProject より先に定義し、onPersistError コールバックに直接渡せるようにする。
+  // useProject の options は安定参照不要（内部で ref 経由で保持される）。
+  const [toasts, setToasts] = useState<ToastEntry[]>([]);
+
+  // toastCounterRef: crypto.randomUUID() 未使用環境での fallback 連番（テスト環境対応）。
+  // レンダー中に使わず副作用内でのみインクリメントするため ref が適切。
+  const toastCounterRef = useRef(0);
+
+  const pushToast = useCallback((message: string, variant: ToastEntry["variant"]) => {
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : String((toastCounterRef.current += 1));
+    setToasts((prev) => [...prev, { id, message, variant }]);
+  }, []);
+
   const {
     project,
     tabs,
@@ -70,22 +87,11 @@ export default function App() {
     switchProject,
     closeProject,
     renameProject,
-  } = useProject();
-
-  // ===== トースト通知 =====
-  const [toasts, setToasts] = useState<ToastEntry[]>([]);
-
-  // toastCounterRef: crypto.randomUUID() 未使用環境での fallback 連番（テスト環境対応）。
-  // レンダー中に使わず副作用内でのみインクリメントするため ref が適切。
-  const toastCounterRef = useRef(0);
-
-  const pushToast = useCallback((message: string, variant: ToastEntry["variant"]) => {
-    const id =
-      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : String((toastCounterRef.current += 1));
-    setToasts((prev) => [...prev, { id, message, variant }]);
-  }, []);
+  } = useProject({
+    // localStorage 容量超過等で永続化が失敗したときにエラートーストを表示する（F-117）。
+    // useProject 内で ref 経由で保持されるため、インライン定義でも再レンダーを引き起こさない。
+    onPersistError: () => pushToast("保存に失敗しました（ブラウザの容量が不足している可能性があります）", "error"),
+  });
 
   const dismissToast = useCallback((id: string) => {
     setToasts((prev) => prev.filter((t) => t.id !== id));
@@ -133,6 +139,9 @@ export default function App() {
 
   const handleConfirmTabClose = useCallback(() => {
     if (closeTargetId !== null) {
+      // closeProject は存在しない id に対して no-op（entries.filter で除外されないため状態不変）。
+      // 現状の同期 UI では確認中に対象が消えるケースは発生しないが、
+      // 将来的に非同期操作が入った場合にも安全なため、防御的にそのまま呼んでよい。
       closeProject(closeTargetId);
       setCloseTargetId(null);
     }

@@ -179,3 +179,39 @@ test("アクティブタブのみ tabIndex=0、他は -1", () => {
   expect(tabs[1]).toHaveAttribute("tabIndex", "0");
   expect(tabs[2]).toHaveAttribute("tabIndex", "-1");
 });
+
+// ===== Delete キーでフォーカス中のタブを閉じる（a11y #2）=====
+
+test("タブが2つ以上のとき Delete キーで onClose(id) が呼ばれる", async () => {
+  const onClose = vi.fn();
+  render(
+    <ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={onClose} onRename={noop} />,
+  );
+  const tabBtns = screen.getAllByRole("tab");
+  // t1 タブにフォーカスして Delete を押す
+  tabBtns[0]!.focus();
+  await userEvent.keyboard("{Delete}");
+  expect(onClose).toHaveBeenCalledWith("t1");
+});
+
+test("タブが1つだけのとき Delete キーで onClose が呼ばれない", async () => {
+  const onClose = vi.fn();
+  render(<ProjectTabs tabs={[tab1]} activeId="t1" onSwitch={noop} onNew={noop} onClose={onClose} onRename={noop} />);
+  const tabBtns = screen.getAllByRole("tab");
+  tabBtns[0]!.focus();
+  await userEvent.keyboard("{Delete}");
+  expect(onClose).not.toHaveBeenCalled();
+});
+
+// ===== インライン編集中は input がタブボタンの外側（兄弟）として描画される（a11y #3）=====
+
+test("編集中は role=tab ボタンが消えて input が tabItem 直下に描画される", async () => {
+  render(<ProjectTabs tabs={[tab1, tab2]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />);
+  // ダブルクリック前: role=tab ボタンが存在する
+  expect(screen.getAllByRole("tab")).toHaveLength(2);
+  await userEvent.dblClick(screen.getByText("プロジェクト1"));
+  // 編集中: t1 の role=tab ボタンは消え、role=tab は t2 のみ
+  expect(screen.getAllByRole("tab")).toHaveLength(1);
+  // input は存在する
+  expect(screen.getByRole("textbox", { name: "プロジェクト名を編集" })).toBeInTheDocument();
+});

@@ -540,3 +540,44 @@ test("clearAllLines は全行を削除しキャラクターは保持する", () 
   expect(result.current.project.lines).toHaveLength(0);
   expect(result.current.project.characters).toHaveLength(1);
 });
+
+// ===== 永続化失敗時の onPersistError コールバック（F-117）=====
+
+test("localStorage.setItem が失敗したとき onPersistError が呼ばれる", () => {
+  const onPersistError = vi.fn();
+  const error = new DOMException("QuotaExceededError");
+
+  // localStorage.setItem を一時的に例外を投げるよう上書きする
+  const setItemSpy = vi.spyOn(Storage.prototype, "setItem").mockImplementationOnce(() => {
+    throw error;
+  });
+
+  // console.error の出力を抑制（テストログを汚さないため）
+  const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+
+  const { result } = renderHook(() => useProject({ onPersistError }));
+
+  // useEffect は初回マウント時に必ず実行される（workspace 変化扱い）ため
+  // この時点で onPersistError が1回呼ばれているはず
+  expect(onPersistError).toHaveBeenCalledTimes(1);
+  expect(onPersistError).toHaveBeenCalledWith(error);
+  expect(consoleErrorSpy).toHaveBeenCalled();
+
+  // 後片付け
+  setItemSpy.mockRestore();
+  consoleErrorSpy.mockRestore();
+
+  // 返り値の型チェック: 引数なし呼び出しと同じ型が返ること
+  expect(result.current.project).toBeDefined();
+});
+
+test("localStorage.setItem が成功しているとき onPersistError は呼ばれない", () => {
+  const onPersistError = vi.fn();
+  renderHook(() => useProject({ onPersistError }));
+  expect(onPersistError).not.toHaveBeenCalled();
+});
+
+test("useProject() を引数なしで呼んでも後方互換（既存テストと同じ動作）", () => {
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("新規プロジェクト");
+});

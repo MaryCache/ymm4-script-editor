@@ -1,5 +1,5 @@
 // src/hooks/useProject.ts
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { Line, Project, Workspace } from "../types";
 import { generateId } from "../utils/id";
 import { colorForIndex } from "../utils/color";
@@ -303,6 +303,25 @@ const updateActiveProject = (w: Workspace, updater: (p: Project) => Project): Wo
 };
 
 /**
+ * `useProject` フックのオプション引数。
+ *
+ * @see {@link useProject}
+ */
+export type UseProjectOptions = {
+  /**
+   * localStorage への永続化が失敗したときに呼ばれるコールバック。
+   *
+   * @remarks
+   * 呼ばれるのは `localStorage.setItem` が例外（容量超過等）を投げた場合のみ。
+   * `console.error` は引き続き出力される（このコールバックは追加通知用）。
+   * 安定参照でなくてもよい（内部で ref 経由で保持するため再レンダーを引き起こさない）。
+   *
+   * @param error - 発生した例外オブジェクト
+   */
+  onPersistError?: (error: unknown) => void;
+};
+
+/**
  * プロジェクト全体の状態管理と永続化を提供するカスタムフック。
  *
  * @remarks
@@ -313,7 +332,9 @@ const updateActiveProject = (w: Workspace, updater: (p: Project) => Project): Wo
  * - `saveToFile` / `exportCSV` / `exportMarkdown` / `exportCSVToClipboard` は
  *   `project` の現在値を参照するため `[project]` 依存になる。
  * - `loadFromFile` / `importMarkdown` は §8-2 に従い、新規タブとして追加してアクティブにする。
+ * - `options.onPersistError` を渡すと永続化失敗時に呼ばれる（F-117 準拠）。
  *
+ * @param options - {@link UseProjectOptions}（省略可）
  * @returns {@link UseProjectReturn} — プロジェクト状態とミューテーター一式
  *
  * @example
@@ -324,18 +345,35 @@ const updateActiveProject = (w: Workspace, updater: (p: Project) => Project): Wo
  * }
  * ```
  *
+ * @example 永続化失敗をトーストで通知する場合
+ * ```ts
+ * const { project } = useProject({
+ *   onPersistError: () => pushToast("保存に失敗しました", "error"),
+ * });
+ * ```
+ *
  * @see {@link UseProjectReturn}
+ * @see {@link UseProjectOptions}
  * @see {@link STORAGE_KEY_WORKSPACE}
  */
-export const useProject = (): UseProjectReturn => {
+export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
   const [workspace, setWorkspace] = useState<Workspace>(restoreWorkspaceFromStorage);
 
+  // onPersistError を ref に退避して useEffect の deps に含めない。
+  // これにより、呼び出し元が毎レンダーでインライン関数を渡しても再レンダーを引き起こさない。
+  const onPersistErrorRef = useRef(options?.onPersistError);
+  useEffect(() => {
+    onPersistErrorRef.current = options?.onPersistError;
+  });
+
   // workspace が変わるたびに localStorage へ永続化する。
+  // 失敗時は console.error に加えて onPersistError コールバックで呼び出し元に通知する（F-117）。
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(workspace));
     } catch (e) {
       console.error("localStorage への保存に失敗しました", e);
+      onPersistErrorRef.current?.(e);
     }
   }, [workspace]);
 
