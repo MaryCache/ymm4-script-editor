@@ -7,6 +7,8 @@ import { BgCanvas } from "./components/BgCanvas/BgCanvas";
 import { OpeningOverlay } from "./components/OpeningOverlay/OpeningOverlay";
 import { PasteImportModal } from "./components/PasteImportModal";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ToastViewport } from "./components/Toast";
+import type { ToastEntry } from "./components/Toast";
 import { buildLineCSV } from "./utils/csv";
 import type { Line } from "./types";
 import styles from "./App.module.css";
@@ -31,8 +33,13 @@ const MARQUEE_TEXT = "YMM4 ▸ SCRIPT ▸ EDITOR ▸ YMM4台本エディタ ▸ 
  * ハンドラー安定化:
  * - `copyLine` は `project.characters` が変化したときのみ再生成（テキスト編集では不変）。
  * - `onMoveUp` / `onMoveDown` は `moveLine` を `useCallback` で包んで引数変換する。
- * - `importMarkdown` / `loadYmscript` は読み込み失敗を `alert` で通知する。
- * - `onCopyAll` はクリップボードエラーを `alert` で通知する（要件 design §8, I-1）。
+ * - `importMarkdown` / `loadYmscript` は読み込み失敗をトースト通知する。
+ * - `onCopyAll` はクリップボードエラーをトースト通知する（要件 design §8, I-1）。
+ *
+ * トースト通知:
+ * - `toasts` state でトーストエントリ一覧を管理する（App ローカル state）。
+ * - `pushToast` で追加、`dismissToast` で id 指定削除。
+ * - `ToastViewport` が body 直下 (createPortal) に描画する。
  */
 export default function App() {
   const {
@@ -58,6 +65,25 @@ export default function App() {
     clearAllLines,
   } = useProject();
 
+  // ===== トースト通知 =====
+  const [toasts, setToasts] = useState<ToastEntry[]>([]);
+
+  // toastCounterRef: crypto.randomUUID() 未使用環境での fallback 連番（テスト環境対応）。
+  // レンダー中に使わず副作用内でのみインクリメントするため ref が適切。
+  const toastCounterRef = useRef(0);
+
+  const pushToast = useCallback((message: string, variant: ToastEntry["variant"]) => {
+    const id =
+      typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+        ? crypto.randomUUID()
+        : String((toastCounterRef.current += 1));
+    setToasts((prev) => [...prev, { id, message, variant }]);
+  }, []);
+
+  const dismissToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
   // ===== モーダル開閉状態 =====
   const [pasteImportOpen, setPasteImportOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
@@ -76,13 +102,13 @@ export default function App() {
   const handleOpenResetAll = useCallback(() => setResetConfirmOpen(true), []);
   const handleCloseResetAll = useCallback(() => setResetConfirmOpen(false), []);
 
-  // コピペインポート実行: n行追加を alert で通知（n=0 は何もしない）
+  // コピペインポート実行: n行追加をトーストで通知（n=0 は何もしない）
   const handleImportPlainText = useCallback(
     (text: string) => {
       const n = importPlainText(text);
-      if (n > 0) alert(`${n} 行を取り込みました。`);
+      if (n > 0) pushToast(`${n} 行を取り込みました。`, "info");
     },
-    [importPlainText],
+    [importPlainText, pushToast],
   );
 
   // 全行リセット確定: prefers-reduced-motion に応じて即時 or フェードアウト後にクリア
@@ -121,40 +147,40 @@ export default function App() {
     (line: Line) => {
       navigator.clipboard.writeText(buildLineCSV(line, project.characters)).catch((e) => {
         console.error("コピーに失敗しました", e);
-        alert("コピーに失敗しました。");
+        pushToast("コピーに失敗しました。", "error");
       });
     },
-    [project.characters],
+    [project.characters, pushToast],
   );
 
   // moveLine のラッパ: moveLine は安定参照だが引数変換が必要なため useCallback で包む
   const onMoveUp = useCallback((id: string) => moveLine(id, "up"), [moveLine]);
   const onMoveDown = useCallback((id: string) => moveLine(id, "down"), [moveLine]);
 
-  // importMarkdown: skipped>0 でユーザー通知、失敗は alert（useProject 側が throw する）
+  // importMarkdown: skipped>0 でトースト通知、失敗もトースト（useProject 側が throw する）
   const importMarkdown = useCallback(
     (file: File) => {
       importMd(file)
         .then((skipped) => {
-          if (skipped > 0) alert(`${skipped} 行を読み込めずスキップしました。`);
+          if (skipped > 0) pushToast(`${skipped} 行を読み込めずスキップしました。`, "info");
         })
-        .catch(() => alert("Markdown の読み込みに失敗しました。"));
+        .catch(() => pushToast("Markdown の読み込みに失敗しました。", "error"));
     },
-    [importMd],
+    [importMd, pushToast],
   );
 
-  // loadYmscript: 失敗は alert（useProject 内で throw された場合のみ）
+  // loadYmscript: 失敗はトースト通知（useProject 内で throw された場合のみ）
   const loadYmscript = useCallback(
     (file: File) => {
-      loadFromFile(file).catch(() => alert("プロジェクトファイルの読み込みに失敗しました。"));
+      loadFromFile(file).catch(() => pushToast("プロジェクトファイルの読み込みに失敗しました。", "error"));
     },
-    [loadFromFile],
+    [loadFromFile, pushToast],
   );
 
-  // 全件コピー失敗はユーザーに通知する（design §8, I-1）
+  // 全件コピー失敗はトーストで通知する（design §8, I-1）
   const onCopyAll = useCallback(() => {
-    exportCSVToClipboard().catch(() => alert("クリップボードへのコピーに失敗しました。"));
-  }, [exportCSVToClipboard]);
+    exportCSVToClipboard().catch(() => pushToast("クリップボードへのコピーに失敗しました。", "error"));
+  }, [exportCSVToClipboard, pushToast]);
 
   // App shell は CSS Grid (.app)。Header / CharacterPanel / ScriptEditor が
   // それぞれ grid-area を自己申告するため、中間の wrapper div は不要になった。
@@ -246,6 +272,9 @@ export default function App() {
         onConfirm={handleConfirmReset}
         onClose={handleCloseResetAll}
       />
+
+      {/* ===== トースト通知ビューポート (body 直下 createPortal) ===== */}
+      <ToastViewport toasts={toasts} onDismiss={dismissToast} />
     </>
   );
 }

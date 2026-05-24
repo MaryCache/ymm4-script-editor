@@ -1,0 +1,140 @@
+/* Toast.module.css
+ *
+ * トースト通知コンポーネントのスタイル。cold-blue-black テーマ。
+ *
+ * z-index 設計:
+ *   OpeningOverlay: 9999（最前面）
+ *   ToastViewport:  9000（OpeningOverlay より下、UI より上）
+ *   Modal:          1000
+ *   CharacterPanel ColorWheel popover: 1200
+ *
+ * アニメーション:
+ *   入場: toast-enter（translateY 8px→0 + opacity 0→1, 240ms, var(--ease-out)）
+ *   退場: CSS は定義なし（即時 DOM 削除。fade-out したい場合は将来拡張で対応）
+ *   prefers-reduced-motion: reduce では入場アニメーションも無効化する。
+ *
+ * 位置: 画面右下（fixed）に縦スタック。
+ */
+
+/* ===== ビューポートラッパー ===== */
+.viewport {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  z-index: 9000;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  /* スクリーンリーダー向けにビューポート全体を aria-label で補完（Toast.tsx 側で設定） */
+  pointer-events: none; /* アイテム自体に pointer-events: auto を付ける */
+  /* 最大幅: 画面の半分か 360px のうち小さい方 */
+  max-width: min(360px, calc(100vw - 48px));
+}
+
+/* ===== ライブリージョンラッパー（aria-live コンテナ）===== */
+/* info / error の aria-live 分離ラッパー。視覚的には transparent（flex 内で item を並べるだけ）。 */
+.liveRegion {
+  display: contents;
+}
+
+/* ===== 個別トーストアイテム ===== */
+.item {
+  pointer-events: auto;
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px 10px 14px;
+  border-radius: var(--radius);
+  background: linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
+  border: 1px solid var(--border-strong);
+  box-shadow:
+    var(--shadow-pop),
+    0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  /* 最大幅はビューポートから継承 */
+  width: 100%;
+  animation: toastEnter 0.24s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+/* ===== info アクセント: cyan ===== */
+.itemInfo {
+  border-left: 3px solid var(--accent-2);
+}
+
+.itemInfo .icon {
+  color: var(--accent-2);
+  font-size: 9px;
+  line-height: 1.8;
+  flex-shrink: 0;
+}
+
+/* ===== error アクセント: --danger ===== */
+.itemError {
+  border-left: 3px solid var(--danger);
+}
+
+.itemError .icon {
+  color: var(--danger);
+  font-size: 10px;
+  line-height: 1.7;
+  flex-shrink: 0;
+}
+
+/* ===== アイコン共通 ===== */
+.icon {
+  flex-shrink: 0;
+  user-select: none;
+}
+
+/* ===== メッセージテキスト ===== */
+.message {
+  flex: 1;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-0);
+  word-break: break-word;
+}
+
+/* ===== × 閉じるボタン ===== */
+.closeBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 10px;
+  cursor: pointer;
+  transition: color 120ms var(--ease-out), background 120ms var(--ease-out);
+  margin-top: -1px;
+}
+.closeBtn:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.06);
+}
+.closeBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ===== 入場アニメーション ===== */
+@keyframes toastEnter {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ===== prefers-reduced-motion: reduce ===== */
+@media (prefers-reduced-motion: reduce) {
+  .item {
+    animation: none;
+  }
+}

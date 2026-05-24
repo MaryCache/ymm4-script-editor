@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import App from "./App";
 
@@ -42,4 +42,34 @@ test("全行リセット確認で行が消える（reduce=true 環境で即時�
     expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
   });
   expect(screen.getByText(/行数:\s*0/)).toBeInTheDocument();
+});
+
+// コピペ取込 → トースト文言が表示される結合テスト
+test("コピペ取込でトースト『N 行を取り込みました。』が表示される", async () => {
+  const { baseElement } = render(<App />);
+
+  // キャラ追加してコピペインポートボタンを開く
+  await userEvent.type(screen.getByPlaceholderText("キャラクター名"), "魔理沙");
+  await userEvent.click(screen.getByRole("button", { name: "追加" }));
+
+  // コピペインポートモーダルを開く
+  await userEvent.click(screen.getByRole("button", { name: "コピペでインポート" }));
+  expect(screen.getByRole("dialog")).toBeInTheDocument();
+
+  // textarea にテキストを入力
+  const textarea = screen.getByRole("textbox", { name: "インポートするテキスト" });
+  await userEvent.type(textarea, "セリフ1\nセリフ2\nセリフ3");
+
+  // 取り込みボタンをクリック
+  await userEvent.click(screen.getByRole("button", { name: "取り込み" }));
+
+  // モーダルが閉じる
+  await waitFor(() => {
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  // トースト通知が表示される（body 直下の aria-label="通知" 内を検索）
+  const viewport = baseElement.querySelector('[aria-label="通知"]');
+  expect(viewport).toBeTruthy();
+  expect(within(viewport as HTMLElement).getByText(/行を取り込みました。/)).toBeInTheDocument();
 });
