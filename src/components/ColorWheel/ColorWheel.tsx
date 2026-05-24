@@ -33,9 +33,11 @@ const RING_WIDTH = 26;
 const RING_INNER = RING_OUTER - RING_WIDTH * 2;
 // リング中心半径（マーカー配置用）。
 const RING_MID_R = RING_OUTER / 2 - RING_WIDTH / 2;
-// SV スクエアの一辺（px）。リング内側の円に内接する正方形＝四隅がちょうど内円（半径 RING_INNER/2）
-// に接する大きさ（一辺 = 内半径 × √2）。これでリングの穴を四角がぴったり埋め、隙間も重なりも出ない。
-const SV_SIZE = Math.round((RING_INNER / 2) * Math.SQRT2);
+// SV スクエアの四隅と内円のあいだに空ける半径方向の隙間（px）。
+// 四隅をちょうど内円に接させると詰まって見えるため、少し内側に縮めて余白を持たせる。
+const SV_GAP = 6;
+// SV スクエアの一辺（px）。四隅が「内半径 − SV_GAP」の円に乗る大きさ（一辺 = その半径 × √2）。
+const SV_SIZE = Math.round((RING_INNER / 2 - SV_GAP) * Math.SQRT2);
 
 /** HSV 型エイリアス（内部状態）。 */
 type Hsv = { h: number; s: number; v: number };
