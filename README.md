@@ -100,6 +100,8 @@ characters:
 
 ## ドキュメント
 
+- [**LLM 向け 台本Markdownフォーマット仕様**](docs/llm-script-format.md) — ChatGPT 等に台本を書かせて、そのまま `.md` 取り込みするための指示書（貼り付けテンプレ付き）
+
 設計・仕様は `docs/spec/` にあります（本文＝初版、各文書末尾の「実装差分・追補」が完成品との同期）。
 
 - [要件定義書](docs/spec/requirements.md)（v1.0 + 実装差分 §9）
