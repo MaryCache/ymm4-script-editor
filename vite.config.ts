@@ -2,33 +2,27 @@ import { defineConfig } from "vite";
 import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 
-// Why SVG instead of PNG: ImageMagick 不要（依存ゼロ）、ベクタなので全サイズに対応、
-// Chrome/Edge の PWA インストール要件（sizes: "any"）を SVG 単独で満たせるため。
+// アイコンはユーザー提供の透過 PNG（public/icon-192.png / icon-512.png、元 1024px から縮小）。
+// background/theme color は cold-blue-black テーマに合わせる。
 export default defineConfig({
   plugins: [
     react(),
     VitePWA({
       registerType: "autoUpdate",
-      // favicon.svg は index.html <link rel="icon"> 用、icon.svg が PWA install 用
-      includeAssets: ["favicon.svg", "icon.svg"],
+      includeAssets: ["favicon.png", "icon-192.png", "icon-512.png"],
       manifest: {
         name: "YMM4台本エディタ",
         short_name: "台本エディタ",
         start_url: "/",
         display: "standalone",
         lang: "ja",
-        background_color: "#0f1117",
-        theme_color: "#5b8dff",
+        background_color: "#00101d",
+        theme_color: "#107dc8",
         icons: [
-          // purpose は "any" のみ。icon.svg はマスク用セーフゾーンを持たないため
-          // "maskable" を名乗らない（名乗ると Android で円形マスクにグリフが欠ける）。
-          // 主ターゲットは Chrome/Edge デスクトップ（モバイルはスコープ外 NF-21）。
-          {
-            src: "icon.svg",
-            sizes: "any",
-            type: "image/svg+xml",
-            purpose: "any",
-          },
+          // purpose は "any" のみ。アイコンは角丸タイルに余白があり、maskable を名乗ると
+          // Android の円形マスクでタイル端が欠けるため。主ターゲットは Chrome/Edge デスクトップ。
+          { src: "icon-192.png", sizes: "192x192", type: "image/png", purpose: "any" },
+          { src: "icon-512.png", sizes: "512x512", type: "image/png", purpose: "any" },
         ],
       },
       workbox: {
