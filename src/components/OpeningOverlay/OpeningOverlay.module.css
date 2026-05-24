@@ -36,30 +36,22 @@
   transform-origin: center;
 }
 
-/* ===== ブランドマーク SVG ===== */
-.brandMark {
-  /* glow は filter で後付け。enter/idle フェーズで適用 */
-  filter: drop-shadow(0 0 18px rgba(43, 180, 230, 0.55));
+/* ===== エンブレム画像（放射光つき吹き出し） ===== */
+.emblem {
+  width: 180px;
+  height: 180px;
+  /* 暗い空間に浮かぶよう、画像のシアンに合わせた柔らかいグローを付与 */
+  filter: drop-shadow(0 0 18px rgba(43, 180, 230, 0.45));
 }
 
-/* ===== テキスト ===== */
-.title {
-  font-family: "IBM Plex Sans JP", "Noto Sans JP", -apple-system, "Hiragino Kaku Gothic ProN", "Yu Gothic UI", system-ui, sans-serif;
-  font-size: 18px;
-  font-weight: 600;
-  letter-spacing: 0.06em;
-  color: rgba(234, 242, 248, 0.92);
-  text-align: center;
-}
-
-.sub {
-  font-family: "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
-  font-size: 10.5px;
-  letter-spacing: 0.18em;
-  color: rgba(43, 180, 230, 0.6);
-  text-transform: uppercase;
-  text-align: center;
-  margin-top: -8px;
+/* ===== タイトルロゴ画像 ===== */
+.logo {
+  width: 300px;
+  max-width: 72vw;
+  height: auto;
+  filter: drop-shadow(0 0 10px rgba(43, 180, 230, 0.3));
+  /* エンブレムとの間隔は .content の gap(16px) で確保 */
+  margin-top: -4px;
 }
 
 /* ===== opening-fade-in (enter フェーズ) ===== */

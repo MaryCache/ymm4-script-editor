@@ -7,7 +7,7 @@
 // 挙動:
 //   1. prefers-reduced-motion: reduce → 即 null を返す (演出非表示)
 //   2. sessionStorage に 'ymm4-opening-shown' があれば即 null を返す (2回目以降スキップ)
-//   3. ブランド (Y4 マーク + 「YMM4台本エディタ」) を fade-in + わずかな scale/glow で表示
+//   3. ブランド (エンブレム画像 + タイトルロゴ画像) を fade-in + わずかな scale/glow で表示
 //   4. アイドル後 fade-out (loading-exit) → DOM から除去
 //   総尺 ~1.4s: fade-in 0.5s + idle 0.4s + fade-out 0.5s
 //
@@ -28,43 +28,6 @@ function checkShouldPlay(): boolean {
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return false;
   if (sessionStorage.getItem(SESSION_KEY) === "1") return false;
   return true;
-}
-
-// ブランドロゴ: SVG インライン (外部リソース不要, NF-02/03)
-function BrandMark() {
-  return (
-    <svg
-      className={styles.brandMark}
-      viewBox="0 0 80 80"
-      width="80"
-      height="80"
-      aria-hidden="true"
-      focusable="false"
-    >
-      {/* 外周リング */}
-      <circle
-        cx="40" cy="40" r="36"
-        fill="none"
-        stroke="rgba(43,180,230,0.5)"
-        strokeWidth="1.5"
-      />
-      {/* 内周リング */}
-      <circle
-        cx="40" cy="40" r="29"
-        fill="none"
-        stroke="rgba(16,125,200,0.25)"
-        strokeWidth="0.75"
-      />
-      {/* Y の左腕 */}
-      <line x1="26" y1="24" x2="40" y2="42" stroke="rgba(88,211,240,0.95)" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Y の右腕 */}
-      <line x1="54" y1="24" x2="40" y2="42" stroke="rgba(88,211,240,0.95)" strokeWidth="2.5" strokeLinecap="round" />
-      {/* Y の軸 */}
-      <line x1="40" y1="42" x2="40" y2="58" stroke="rgba(88,211,240,0.95)" strokeWidth="2.5" strokeLinecap="round" />
-      {/* 4 の横棒 */}
-      <line x1="29" y1="46" x2="45" y2="46" stroke="rgba(43,180,230,0.75)" strokeWidth="1.5" strokeLinecap="round" />
-    </svg>
-  );
 }
 
 type Phase = "enter" | "idle" | "exit" | "done";
@@ -148,9 +111,10 @@ export function OpeningOverlay() {
       aria-hidden="true"
     >
       <div className={styles.content} ref={contentRef}>
-        <BrandMark />
-        <p className={styles.title}>YMM4台本エディタ</p>
-        <p className={styles.sub}>Script Editor</p>
+        {/* エンブレム（放射光つき吹き出し）とタイトルロゴはユーザー提供の透過 PNG。
+            overlay 全体が aria-hidden のため画像は装飾扱い（alt は実質無視される）。 */}
+        <img className={styles.emblem} src="/opening-emblem.png" alt="" width={180} height={180} />
+        <img className={styles.logo} src="/opening-logo.png" alt="YMM4台本エディタ" />
       </div>
     </div>
   );
