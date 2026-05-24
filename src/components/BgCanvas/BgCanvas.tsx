@@ -3,12 +3,12 @@
 // canvas-gyro 代替実装: 依存ゼロの vanilla canvas で Three.js の精神を再現する。
 // オリジナル (makery-subculture / bg-decoration-family) は Three.js + pointermove/deviceorientation
 // 連動の3Dパララックスだが、外部依存禁止 (NF-02/03 / ADR 依存最小) のため以下で代替する:
-//   - 40〜60 粒の淡い cyan ドットを複数レイヤーに分け描画
+//   - 52粒固定の淡い cyan ドット（PARTICLE_COUNT = 52）を複数レイヤーに分け描画
 //   - pointermove でポインタ位置に応じてレイヤーごとに視差シフト (parallax-family の精神)
 //   - 常時ゆるやかな drift を rAF で合成
 //   - prefers-reduced-motion: reduce → rAF を回さず静止キャンバスのまま (即 return)
 //   - document.hidden → rAF 一時停止 (ページ非表示時の無駄なCPU使用を防ぐ)
-//   - devicePixelRatio 対応 + resize 対応
+//   - devicePixelRatio 対応 + resize 対応 (dpr は resize 毎に再取得)
 //   - unmount で rAF / listener / visibilitychange を全て解除
 //
 // アクセシビリティ:
@@ -30,6 +30,7 @@ type Particle = {
   speed: number;   // alpha パルスの速さ (rad/frame)
 };
 
+// 52粒固定（モジュール冒頭コメント「52粒固定」と一致）
 const PARTICLE_COUNT = 52;
 // 視差シフト最大量 (logical px)。小さめにして主コンテンツを邪魔しない。
 const PARALLAX_STRENGTH = 28;
@@ -75,7 +76,8 @@ export function BgCanvas() {
     const cvs: HTMLCanvasElement = canvas;
     const context: CanvasRenderingContext2D = ctx;
 
-    const dpr = window.devicePixelRatio || 1;
+    // dpr を let にすることで別モニタへ移動した際に resize() 内で再取得できる
+    let dpr = window.devicePixelRatio || 1;
     let width = 0;
     let height = 0;
 
@@ -89,8 +91,11 @@ export function BgCanvas() {
 
     const particles = makeParticles(PARTICLE_COUNT);
 
-    // canvas サイズを window に合わせて設定する
+    // canvas サイズを window に合わせて設定する。
+    // dpr は毎回 window.devicePixelRatio を再取得する: 別 DPI モニタへ移動後の resize
+    // イベントで正しいスケールが適用されるようにするため。
     function resize() {
+      dpr = window.devicePixelRatio || 1;
       width = window.innerWidth;
       height = window.innerHeight;
       // devicePixelRatio 対応: CSS サイズと実ピクセル数を分離
@@ -132,11 +137,18 @@ export function BgCanvas() {
         const px = p.x * width  + offsetX * p.depth;
         const py = p.y * height + offsetY * p.depth;
 
-        // 描画 — cyan (#58d3f0) の淡い点
+        // 描画 — cyan (#58d3f0) の淡い点。
+        // fillStyle を "#58d3f0" 固定にして透明度は globalAlpha で表現する。
+        // 粒×60fps の毎フレームで rgba 文字列を生成すると GC 圧がかかるため、
+        // 文字列生成を無くして globalAlpha の数値代入に置き換える。
+        // 描画後は globalAlpha を 1 に戻し、他の描画処理への影響を防ぐ。
+        const clampedAlpha = Math.min(1, Math.max(0, p.alpha * alphaMod));
         context.beginPath();
         context.arc(px, py, p.r, 0, Math.PI * 2);
-        context.fillStyle = `rgba(88,211,240,${(p.alpha * alphaMod).toFixed(3)})`;
+        context.fillStyle = "#58d3f0";
+        context.globalAlpha = clampedAlpha;
         context.fill();
+        context.globalAlpha = 1;
       }
 
       rafId = requestAnimationFrame(draw);
@@ -187,12 +199,16 @@ export function BgCanvas() {
   return (
     <canvas
       ref={canvasRef}
-      // 背面固定: position/z-index は bgAmbient 内で制御
+      // 背面固定: position/z-index は bgAmbient 内で制御。
+      // mask-image: ブロブと同様に縁をフェードさせ、粒子が画面端でぶつ切りにならないようにする。
+      // radial-gradient の楕円形状は bgAmbient の mask-image と視覚的に揃える。
       style={{
         position: "absolute",
         inset: 0,
         pointerEvents: "none",
         display: "block",
+        maskImage: "radial-gradient(ellipse 90% 88% at 50% 50%, black 40%, transparent 100%)",
+        WebkitMaskImage: "radial-gradient(ellipse 90% 88% at 50% 50%, black 40%, transparent 100%)",
       }}
       aria-hidden="true"
       role="presentation"

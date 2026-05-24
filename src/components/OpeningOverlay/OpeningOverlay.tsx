@@ -69,7 +69,11 @@ function BrandMark() {
 
 type Phase = "enter" | "idle" | "exit" | "done";
 
-const T_ENTER = 500;   // opening-fade-in 尺 (ms)
+// T_ENTER は CSS の openingFadeIn duration(0.5s=500ms) より少し長く設定する。
+// 両者が完全一致するとタイマー誤差で enter→idle 切替が animation 終了前に起き、
+// .idle が animation:none なため一瞬 opacity:0 に戻るフラッシュが発生する。
+// 40ms のバッファで CSS 側が先に完了することを保証する（総尺への影響は無視できる）。
+const T_ENTER = 540;   // opening-fade-in 尺 (ms) ※CSS animation 500ms + 40ms buffer
 const T_IDLE  = 400;   // アイドル時間 (ms)
 const T_EXIT  = 500;   // loading-exit 尺 (ms)
 
@@ -83,6 +87,11 @@ export function OpeningOverlay() {
   // タイマー起動済みフラグ: Strict Mode の二重 effect 起動でタイマーが二重に張られないための防衛。
   // react-hooks/refs: ref.current は render 中には参照しない (effect 内のみ)。
   const timerStartedRef = useRef(false);
+
+  // .content 要素への ref: enter→idle 遷移を animationend で受ける（フラッシュ回避の補助）。
+  // T_ENTER タイムアウトより animationend の方が先に到着した場合は animationend を優先し、
+  // タイムアウト側は clearTimeout で無効化する。
+  const contentRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     // done フェーズ (reduced-motion / 2回目以降 / Strict Mode 二重起動) はスキップ
@@ -98,15 +107,33 @@ export function OpeningOverlay() {
     // セッション中のスキップ記録 (effect 内で行うことで SSR 安全)
     sessionStorage.setItem(SESSION_KEY, "1");
 
-    // enter → idle → exit → done のシーケンスをタイマーで制御
-    const t1 = window.setTimeout(() => setPhase("idle"),  T_ENTER);
+    // enter → idle: animationend で受ける（CSS 完了を確実に待つ）。
+    // T_ENTER のタイムアウトはフォールバック（animationend が発火しない環境向け）。
+    let t1: ReturnType<typeof window.setTimeout> | null = null;
+
+    function onEnterEnd() {
+      if (t1 !== null) {
+        window.clearTimeout(t1);
+        t1 = null;
+      }
+      setPhase("idle");
+    }
+
+    const contentEl = contentRef.current;
+    if (contentEl) {
+      contentEl.addEventListener("animationend", onEnterEnd, { once: true });
+    }
+    // フォールバックタイムアウト: animationend が来なかった場合に遷移を保証する
+    t1 = window.setTimeout(onEnterEnd, T_ENTER);
+
     const t2 = window.setTimeout(() => setPhase("exit"),  T_ENTER + T_IDLE);
     const t3 = window.setTimeout(() => setPhase("done"),  T_ENTER + T_IDLE + T_EXIT);
 
     return () => {
-      window.clearTimeout(t1);
+      if (t1 !== null) window.clearTimeout(t1);
       window.clearTimeout(t2);
       window.clearTimeout(t3);
+      if (contentEl) contentEl.removeEventListener("animationend", onEnterEnd);
       // Strict Mode でクリーンアップされた場合は次の mount で再試行できるようにリセット
       timerStartedRef.current = false;
     };
@@ -120,7 +147,7 @@ export function OpeningOverlay() {
       className={`${styles.overlay} ${styles[phase]}`}
       aria-hidden="true"
     >
-      <div className={styles.content}>
+      <div className={styles.content} ref={contentRef}>
         <BrandMark />
         <p className={styles.title}>YMM4台本エディタ</p>
         <p className={styles.sub}>Script Editor</p>

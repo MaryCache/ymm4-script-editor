@@ -104,6 +104,7 @@ export default function App() {
           <div className={styles.marqueeTrack}>
             <div className={styles.marqueeInner}>
               {/* 2本並べることでシームレスループ: translateX(-50%) で左半分分移動 */}
+              {/* repeat(8): MARQUEE_TEXT ≒ 40文字×11px≒440px。8回≒3520px で 4K(3840px)をカバーする最低反復数 */}
               <span className={styles.marqueeText}>{MARQUEE_TEXT.repeat(8)}</span>
               <span className={styles.marqueeText}>{MARQUEE_TEXT.repeat(8)}</span>
             </div>

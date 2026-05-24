@@ -238,6 +238,13 @@
   display: flex; justify-content: space-between; align-items: center;
   background: linear-gradient(180deg, transparent, rgba(0, 0, 0, 0.25));
 }
+
+/* サイドバーフッター左側: heroPulseDot とラベルを横並びにする */
+.sidebarFooterInner {
+  display: flex;
+  align-items: center;
+}
+
 .ver { font-family: var(--font-mono); }
 
 /* ===== hero-pulse ドット (linear-app / bg-decoration-family)

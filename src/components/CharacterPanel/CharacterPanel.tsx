@@ -126,7 +126,7 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
        *   heroPulseDot: 小さな cyan 脈動ドットで「動作してる感」を演出。
        * ===== */}
       <div className={styles.sidebarFooter} aria-hidden="true">
-        <span style={{ display: "flex", alignItems: "center" }}>
+        <span className={styles.sidebarFooterInner}>
           <span className={styles.heroPulseDot} />
           YMM4 Script Editor
         </span>
