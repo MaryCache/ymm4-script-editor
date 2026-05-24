@@ -82,15 +82,12 @@ export default function App() {
          *   aria-hidden: 純粋な装飾レイヤー。pointer-events: none (CSS)。
          *   z-index: 0 で UI より背面。
          *   内包:
-         *     bgBlob1/2 — glass-fade 強化ブロブ (blur + mask-image)
+         *     slow-rot リング (bgAmbient::before/::after) — 切れ目つきの回転弧
          *     BgCanvas  — canvas-gyro 代替 (vanilla canvas, 依存ゼロ)
          *     marqueeTrack — marquee-scroll (linear-app)
+         *   ※ 旧コーナーのブロブ (bgBlob1/2) はユーザー要望で削除した。
          * ===== */}
         <div className={styles.bgAmbient} aria-hidden="true">
-          {/* glass-fade 強化ブロブ: filter:blur + mask-image で柔らかい発光 */}
-          <span className={styles.bgBlob1} />
-          <span className={styles.bgBlob2} />
-
           {/* canvas-gyro 代替: vanilla canvas で粒子視差を描画。
            *  reduced-motion / document.hidden 時は rAF 停止。
            *  unmount で全リスナ解除。 */}

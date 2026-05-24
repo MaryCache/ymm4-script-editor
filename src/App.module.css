@@ -52,17 +52,26 @@
   left: 50%;
   translate: -50% -50%;
   border-radius: 50%;
-  border: 1px solid rgba(43, 180, 230, 0.055);
-  /* 内側にも細い光線を追加: box-shadow で inset リング */
-  box-shadow:
-    inset 0 0 0 60px rgba(16, 125, 200, 0.018),
-    0 0 0 1px rgba(88, 211, 240, 0.03);
+  /* 切れ目のある弧で回転を可視化する。
+   * Why: 均一な円環は回しても見た目が変わらず「回っている」ことが伝わらない。
+   * conic-gradient で「光る弧＋透明の隙間」を作り、radial の mask で 1.5px のリング形に
+   * 切り抜くことで、弧と隙間が一緒に回って回転がはっきり分かる。 */
+  background: conic-gradient(
+    from 0deg,
+    transparent 0deg 20deg,
+    rgba(88, 211, 240, 0.11) 32deg 72deg,
+    transparent 84deg 178deg,
+    rgba(43, 180, 230, 0.08) 190deg 232deg,
+    transparent 244deg 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 1.5px), #000 calc(100% - 1.5px));
   animation: slowRot 80s linear infinite;
   will-change: transform;
   pointer-events: none;
 }
 
-/* 二重リング: 逆方向・異サイズで奥行き感 */
+/* 二重リング: 逆方向・異サイズ・別位置の切れ目で奥行き感 */
 .bgAmbient::after {
   content: "";
   position: absolute;
@@ -72,7 +81,16 @@
   left: 50%;
   translate: -50% -50%;
   border-radius: 50%;
-  border: 1px solid rgba(16, 125, 200, 0.03);
+  background: conic-gradient(
+    from 90deg,
+    transparent 0deg 28deg,
+    rgba(16, 125, 200, 0.09) 38deg 64deg,
+    transparent 74deg 205deg,
+    rgba(88, 211, 240, 0.07) 214deg 250deg,
+    transparent 260deg 360deg
+  );
+  -webkit-mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
+          mask: radial-gradient(farthest-side, transparent calc(100% - 1px), #000 calc(100% - 1px));
   animation: slowRotReverse 120s linear infinite;
   will-change: transform;
   pointer-events: none;
@@ -86,96 +104,6 @@
 @keyframes slowRotReverse {
   from { transform: rotate(0deg); }
   to   { transform: rotate(-360deg); }
-}
-
-/* ===== Blob 1: cyan, top-left
- * glass-fade 強化: filter: blur(52px) でバンディングを解消し、柔らかい発光にする。
- * mask-image グラデで縁を溶かし、gradient が「くすむ/途切れる」のを防ぐ。
- * float-vertical animation (bg-decoration-family) — translate/scale のみ (GPU composited)。
- */
-.bgBlob1 {
-  display: block;
-  position: absolute;
-  width: 800px;
-  height: 600px;
-  border-radius: 50%;
-  /* 多ストップ + 低彩度スタートでバンディングを抑制 */
-  background: radial-gradient(
-    ellipse at center,
-    rgba(16, 125, 200, 0.22) 0%,
-    rgba(16, 125, 200, 0.14) 25%,
-    rgba(16, 125, 200, 0.06) 55%,
-    transparent 75%
-  );
-  /* blur でバンディング解消 + 柔らかい発光 (glass-fade 系の考え方) */
-  filter: blur(52px);
-  /* mask-image で縁を自然に溶かす */
-  mask-image: radial-gradient(ellipse at center, black 30%, transparent 75%);
-  top: -18%;
-  left: -12%;
-  animation: blobDrift1 45s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-/* Blob 2: lighter cyan, bottom-right */
-.bgBlob2 {
-  display: block;
-  position: absolute;
-  width: 700px;
-  height: 520px;
-  border-radius: 50%;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(43, 180, 230, 0.16) 0%,
-    rgba(43, 180, 230, 0.09) 30%,
-    rgba(43, 180, 230, 0.03) 60%,
-    transparent 78%
-  );
-  filter: blur(60px);
-  mask-image: radial-gradient(ellipse at center, black 25%, transparent 72%);
-  bottom: -12%;
-  right: -10%;
-  animation: blobDrift2 60s ease-in-out infinite alternate;
-  will-change: transform;
-}
-
-/* Star-flicker dots (star-flicker / mahoyaku-1st / bg-decoration-family).
- * blur 適用後もドットは残すが、opacity をさらに抑えて主張しすぎないようにする。
- */
-.bgBlob1::before,
-.bgBlob1::after,
-.bgBlob2::before,
-.bgBlob2::after {
-  content: "";
-  position: absolute;
-  width: 2px;
-  height: 2px;
-  border-radius: 50%;
-  background: rgba(88, 211, 240, 0.55);
-}
-.bgBlob1::before { top: 30%; left: 55%; animation: starFlicker 7s ease-in-out infinite; }
-.bgBlob1::after  { top: 65%; left: 30%; animation: starFlicker 11s ease-in-out 2.5s infinite; }
-.bgBlob2::before { top: 25%; left: 60%; animation: starFlicker 9s ease-in-out 1s infinite; }
-.bgBlob2::after  { top: 70%; left: 40%; animation: starFlicker 14s ease-in-out 4s infinite; }
-
-/* Blob drift keyframes — translate/scale only for GPU compositing */
-@keyframes blobDrift1 {
-  0%   { transform: translate(0px, 0px) scale(1); }
-  33%  { transform: translate(30px, 20px) scale(1.04); }
-  66%  { transform: translate(-15px, 35px) scale(0.97); }
-  100% { transform: translate(20px, -15px) scale(1.02); }
-}
-@keyframes blobDrift2 {
-  0%   { transform: translate(0px, 0px) scale(1); }
-  40%  { transform: translate(-25px, -20px) scale(1.05); }
-  70%  { transform: translate(15px, 25px) scale(0.96); }
-  100% { transform: translate(-20px, 10px) scale(1.03); }
-}
-
-/* star-flicker keyframe (bg-decoration-family) */
-@keyframes starFlicker {
-  0%, 100% { opacity: 0.05; }
-  50%       { opacity: 0.65; }
 }
 
 /* ===== marquee-scroll (linear-app / bg-decoration-family)
@@ -233,13 +161,6 @@
 
 /* prefers-reduced-motion: 全演出の infinite アニメーションを停止 */
 @media (prefers-reduced-motion: reduce) {
-  /* blob drift & star */
-  .bgBlob1 { animation: none; }
-  .bgBlob2 { animation: none; }
-  .bgBlob1::before,
-  .bgBlob1::after,
-  .bgBlob2::before,
-  .bgBlob2::after { animation: none; }
   /* slow-rot rings */
   .bgAmbient::before { animation: none; }
   .bgAmbient::after  { animation: none; }
