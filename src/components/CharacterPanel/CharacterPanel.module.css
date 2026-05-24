@@ -220,15 +220,12 @@
     0 0 16px var(--c-glow, transparent);
 }
 
-/* ColorWheel ポップオーバー: ドットボタンの右下に絶対配置。
- * left: 16px でドット直近。top: 16px で少し下にオフセット。
- * z-index: 500 は ColorWheel 自身が持つが、ここでも重ねて念押し。
- */
+/* ColorWheel ポップオーバー: body 直下へ portal し、position/left/top/z-index は
+ * JS（popoverStyle）が inline で付与する。サイドバーの overflow にクリップされないようにするため。
+ * ここではフォールバックのみ（インラインが効くので実質上書きされる）。 */
 .colorPopover {
-  position: absolute;
-  top: 16px;
-  left: 16px;
-  z-index: 500;
+  position: fixed;
+  z-index: 1200;
 }
 
 .name {

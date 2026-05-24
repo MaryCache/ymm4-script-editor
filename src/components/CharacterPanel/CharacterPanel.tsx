@@ -1,8 +1,28 @@
 // src/components/CharacterPanel/CharacterPanel.tsx
-import { useState, useCallback, type ChangeEvent, type KeyboardEvent } from "react";
+import { useState, useCallback, type ChangeEvent, type CSSProperties, type KeyboardEvent } from "react";
+import { createPortal } from "react-dom";
 import type { Character } from "../../types";
 import { ColorWheel } from "../ColorWheel";
 import styles from "./CharacterPanel.module.css";
+
+// ColorWheel ポップオーバーの概算サイズ（クランプ計算用）。
+const WHEEL_W = 220;
+const WHEEL_H = 300;
+
+// ドットの矩形を基準に、画面内に収まるポップオーバー位置を返す。
+// Why fixed + portal: サイドバー（.panel/.charList）が overflow:hidden/auto のため、
+// 絶対配置のポップオーバーは親にクリップされて隠れる。body 直下へ portal し fixed で
+// ビューポート基準に置くことで overflow を脱出する。
+function popoverStyle(anchor: DOMRect): CSSProperties {
+  const vw = window.innerWidth;
+  const vh = window.innerHeight;
+  // 基本はドットの右側に出す。右に入りきらなければ左側へ。
+  let left = anchor.right + 10;
+  if (left + WHEEL_W > vw - 8) left = Math.max(8, anchor.left - WHEEL_W - 10);
+  // 縦はドット上端に合わせ、下にはみ出すなら上方向へ寄せる。
+  const top = Math.max(8, Math.min(anchor.top, vh - WHEEL_H - 8));
+  return { position: "fixed", left, top, zIndex: 1200 };
+}
 
 /**
  * `CharacterPanel` コンポーネントの props 型。
@@ -167,13 +187,17 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
   // colorEditingId: ColorWheel を表示中のキャラ ID（null = 非表示）。
   // 開けるのは1つのみ（排他）。
   const [colorEditingId, setColorEditingId] = useState<string | null>(null);
+  // 色相環ポップオーバーの位置決め用に、開いたドットの矩形を保持する。
+  const [colorAnchor, setColorAnchor] = useState<DOMRect | null>(null);
 
-  const openColorWheel = useCallback((id: string) => {
+  const openColorWheel = useCallback((id: string, anchor: DOMRect) => {
+    setColorAnchor(anchor);
     setColorEditingId(id);
   }, []);
 
   const closeColorWheel = useCallback(() => {
     setColorEditingId(null);
+    setColorAnchor(null);
   }, []);
 
   return (
@@ -236,18 +260,22 @@ export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorC
                     // グロー色は同じ hex にアルファを乗せた近似値（CSS color-mix() は未対応環境があるため inline 変数）。
                     ["--c-glow" as string]: c.color + "80",
                   }}
-                  onClick={() => openColorWheel(c.id)}
+                  onClick={(e) => openColorWheel(c.id, e.currentTarget.getBoundingClientRect())}
                 />
-                {/* ColorWheel ポップオーバー: ドットボタンの近傍に絶対配置 */}
-                {isColorOpen && (
-                  <div className={styles.colorPopover}>
-                    <ColorWheel
-                      color={c.color}
-                      onChange={(hex) => onColorChange(c.id, hex)}
-                      onClose={closeColorWheel}
-                    />
-                  </div>
-                )}
+                {/* ColorWheel ポップオーバー: body 直下へ portal し、ドット矩形基準で fixed 配置。
+                    Why portal: サイドバーの overflow にクリップされて隠れるのを防ぐ。 */}
+                {isColorOpen &&
+                  colorAnchor &&
+                  createPortal(
+                    <div className={styles.colorPopover} style={popoverStyle(colorAnchor)}>
+                      <ColorWheel
+                        color={c.color}
+                        onChange={(hex) => onColorChange(c.id, hex)}
+                        onClose={closeColorWheel}
+                      />
+                    </div>,
+                    document.body,
+                  )}
               </span>
 
               {/* ===== キャラ名: 通常表示 / インライン編集切り替え（§2.2）===== */}
