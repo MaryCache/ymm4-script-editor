@@ -966,6 +966,125 @@ test("saveToFile: materialize — 未参照の共通キャラは書き出しに�
   });
 });
 
+// ===== F-128 インポート時の共通キャラ照合 =====
+
+test("loadFromFile (F-128): 共通キャラ（霊夢）をピンした状態で霊夢を含む .ymscript をロード → 新規タブで霊夢が1人だけ、行が共通 id を参照", async () => {
+  const { result } = renderHook(() => useProject());
+
+  // 霊夢をローカルに追加してピン
+  act(() => result.current.addCharacter("霊夢"));
+  const pinnedReimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(pinnedReimuId));
+  expect(result.current.pinnedCharacters[0]!.id).toBe(pinnedReimuId);
+
+  // 霊夢を含む .ymscript を読み込む（別のローカル id を持つ）
+  const importedReimuId = "imported-reimu-id";
+  const ymscript = JSON.stringify({
+    version: 1,
+    projectName: "霊夢の台本",
+    characters: [{ id: importedReimuId, name: "霊夢", color: "#AABBCC" }],
+    lines: [{ id: "imported-line-1", characterId: importedReimuId, text: "こんにちは" }],
+  });
+  const file = new File([ymscript], "reimu.ymscript", { type: "application/json" });
+
+  await act(async () => {
+    await result.current.loadFromFile(file);
+  });
+
+  // 新規タブがアクティブになっている
+  expect(result.current.tabs).toHaveLength(2);
+  expect(result.current.project.projectName).toBe("霊夢の台本");
+
+  // ローカルキャラに霊夢が追加されていない（共通に同定されたため）
+  expect(result.current.project.characters).toHaveLength(0);
+
+  // 実効一覧では共通の霊夢が1人だけ
+  expect(result.current.characters).toHaveLength(1);
+  expect(result.current.characters[0]!.name).toBe("霊夢");
+
+  // 行の characterId が共通の霊夢 id に付け替わっている
+  expect(result.current.project.lines).toHaveLength(1);
+  expect(result.current.project.lines[0]!.characterId).toBe(pinnedReimuId);
+});
+
+test("loadFromFile (F-128): 同名なしキャラはローカルとして取り込まれる", async () => {
+  const { result } = renderHook(() => useProject());
+
+  // 霊夢を共通にピン
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.pinCharacter(result.current.project.characters[0]!.id));
+
+  // 霊夢（共通と同定）＋咲夜（新規）を含む .ymscript
+  const ymscript = JSON.stringify({
+    version: 1,
+    projectName: "混合台本",
+    characters: [
+      { id: "imp-reimu", name: "霊夢", color: "#000" },
+      { id: "imp-sakuya", name: "咲夜", color: "#FFF" },
+    ],
+    lines: [
+      { id: "ll1", characterId: "imp-reimu", text: "A" },
+      { id: "ll2", characterId: "imp-sakuya", text: "B" },
+    ],
+  });
+  const file = new File([ymscript], "mixed.ymscript", { type: "application/json" });
+
+  await act(async () => {
+    await result.current.loadFromFile(file);
+  });
+
+  // 咲夜のみローカルに取り込まれる
+  expect(result.current.project.characters).toHaveLength(1);
+  expect(result.current.project.characters[0]!.name).toBe("咲夜");
+
+  // 霊夢の行は共通 id へ、咲夜の行はそのまま
+  const pinnedReimuId = result.current.pinnedCharacters[0]!.id;
+  expect(result.current.project.lines[0]!.characterId).toBe(pinnedReimuId);
+  expect(result.current.project.lines[1]!.characterId).toBe("imp-sakuya");
+});
+
+test("importMarkdown (F-128): 共通キャラ（霊夢）をピンした状態で霊夢を含む .md をインポート → 行が共通 id を参照", async () => {
+  const { result } = renderHook(() => useProject());
+
+  // 霊夢を共通にピン
+  act(() => result.current.addCharacter("霊夢"));
+  const pinnedReimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(pinnedReimuId));
+
+  // 霊夢を含む Markdown
+  const md = new File(["霊夢: おはよう\n魔理沙: どうも"], "test.md", { type: "text/markdown" });
+
+  await act(async () => {
+    await result.current.importMarkdown(md);
+  });
+
+  // 新規タブがアクティブ
+  expect(result.current.tabs).toHaveLength(2);
+
+  // ローカルに霊夢が重複追加されていない（霊夢は共通に同定）
+  // 魔理沙は新規ローカルとして取り込まれる
+  expect(result.current.project.characters).toHaveLength(1);
+  expect(result.current.project.characters[0]!.name).toBe("魔理沙");
+
+  // 霊夢の行の characterId が共通 id になっている
+  const reimuLine = result.current.project.lines.find((l) => l.text === "おはよう")!;
+  expect(reimuLine.characterId).toBe(pinnedReimuId);
+});
+
+test("importMarkdown (F-128): pinned が空なら全キャラがローカルとして取り込まれる", async () => {
+  const { result } = renderHook(() => useProject());
+
+  const md = new File(["霊夢: こんにちは\n魔理沙: どうも"], "nopin.md", { type: "text/markdown" });
+
+  await act(async () => {
+    await result.current.importMarkdown(md);
+  });
+
+  // pinned なしなので霊夢・魔理沙の両方がローカルに
+  expect(result.current.project.characters).toHaveLength(2);
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+});
+
 // テスト5: CSV/コピー — 共通キャラを話者にした行の名前が解決される
 test("exportCSVToClipboard: 共通キャラを話者にした行の CSV で名前が解決される", async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);

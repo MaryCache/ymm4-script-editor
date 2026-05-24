@@ -2,6 +2,75 @@
 import type { Character, Line, Project, Workspace, WorkspaceEntry } from "../types";
 
 /**
+ * インポートされたプロジェクトのキャラクターを、共通（ピン）プールと名前で照合し、
+ * 重複なしに統合したプロジェクトを返す純関数（F-128）。
+ *
+ * @remarks
+ * 処理の概要:
+ * 1. `imported.characters` の各キャラについて、`name.trim()` が `pinned` のいずれかと
+ *    一致するかを検査する（trim 後の大文字小文字は区別する）。
+ * 2. 一致した場合（「同定」）: そのキャラはローカルに追加せず、
+ *    `importedId → pinnedId` のマップを作成する。名前・色は共通側を優先する。
+ * 3. 一致しなかった場合: キャラを id 不変のままローカルに残す。
+ * 4. `imported.lines` の `characterId` をマップで付け替える（同定されたものは pinnedId へ）。
+ *
+ * 同名の imported キャラが複数あっても、同じ pinnedId にマップして問題ない。
+ * `projectName` / `version` は変更しない。
+ *
+ * @param imported - インポートされたプロジェクト（`parseProjectFile` 済み）
+ * @param pinned - 現在の共通（ピン）キャラクター一覧
+ * @returns 共通キャラとの重複を解消したプロジェクト
+ *
+ * @example
+ * ```ts
+ * const pinned = [{ id: "p-reimu", name: "霊夢", color: "#FF6B6B" }];
+ * const imported: Project = {
+ *   version: 1,
+ *   projectName: "台本A",
+ *   characters: [{ id: "local-reimu", name: "霊夢", color: "#AABBCC" }],
+ *   lines: [{ id: "l1", characterId: "local-reimu", text: "やあ" }],
+ * };
+ * const result = reconcileImportedCharacters(imported, pinned);
+ * // result.characters は [] (霊夢はローカルに含まれない)
+ * // result.lines[0].characterId === "p-reimu"
+ * ```
+ */
+export const reconcileImportedCharacters = (imported: Project, pinned: Character[]): Project => {
+  // trim 後名前 → pinnedId のルックアップマップを構築する。
+  // 同名が複数あれば最初の一致を採用（先着優先）。
+  const pinnedByName = new Map<string, string>();
+  for (const pc of pinned) {
+    const key = pc.name.trim();
+    if (!pinnedByName.has(key)) {
+      pinnedByName.set(key, pc.id);
+    }
+  }
+
+  // imported.characters を走査し、同名共通が存在するものは idMap に記録してローカルから除外。
+  // 同名共通がないものはローカルに残す（id 不変）。
+  const idMap = new Map<string, string>(); // importedId → pinnedId
+  const localCharacters: Character[] = [];
+
+  for (const ic of imported.characters) {
+    const pinnedId = pinnedByName.get(ic.name.trim());
+    if (pinnedId !== undefined) {
+      // 同定: imported id を pinnedId へマッピング（共通側の名前・色を優先するため ic は捨てる）
+      idMap.set(ic.id, pinnedId);
+    } else {
+      localCharacters.push(ic);
+    }
+  }
+
+  // lines の characterId を付け替える（マップに存在するものだけ）
+  const reconciledLines = imported.lines.map((l) => {
+    const mappedId = idMap.get(l.characterId);
+    return mappedId !== undefined ? { ...l, characterId: mappedId } : l;
+  });
+
+  return { ...imported, characters: localCharacters, lines: reconciledLines };
+};
+
+/**
  * 文字列からファイル名として不正な文字を除去し、安全なファイル名を返す。
  *
  * @remarks

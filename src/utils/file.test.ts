@@ -1,5 +1,5 @@
-import { parseProjectFile, parseWorkspaceFile, sanitizeFilename } from "./file";
-import type { Project, Workspace } from "../types";
+import { parseProjectFile, parseWorkspaceFile, reconcileImportedCharacters, sanitizeFilename } from "./file";
+import type { Character, Project, Workspace } from "../types";
 
 const valid: Project = {
   version: 1,
@@ -158,4 +158,125 @@ test("parseWorkspaceFile: pinnedCharacters が配列でない場合は例外", (
     pinnedCharacters: "not-an-array",
   };
   expect(() => parseWorkspaceFile(ws)).toThrow();
+});
+
+// ===== reconcileImportedCharacters =====
+
+const reimuPinned: Character = { id: "p-reimu", name: "霊夢", color: "#FF6B6B" };
+const marisaPinned: Character = { id: "p-marisa", name: "魔理沙", color: "#4ECDC4" };
+
+test("reconcileImportedCharacters: 同名キャラが pinned にある → ローカルに含まれず、line の characterId が pinnedId に付け替わる", () => {
+  const imported: Project = {
+    version: 1,
+    projectName: "台本A",
+    characters: [{ id: "local-reimu", name: "霊夢", color: "#AABBCC" }],
+    lines: [{ id: "l1", characterId: "local-reimu", text: "やあ" }],
+  };
+  const result = reconcileImportedCharacters(imported, [reimuPinned]);
+  // 霊夢はローカルに含まれない
+  expect(result.characters).toHaveLength(0);
+  // 行の characterId が pinnedId に付け替わっている
+  expect(result.lines[0]!.characterId).toBe("p-reimu");
+  // その他のフィールドは不変
+  expect(result.projectName).toBe("台本A");
+  expect(result.version).toBe(1);
+});
+
+test("reconcileImportedCharacters: 同名が無いキャラ → ローカルに残り id 不変、lines もそのまま", () => {
+  const imported: Project = {
+    version: 1,
+    projectName: "台本B",
+    characters: [{ id: "local-youmu", name: "妖夢", color: "#FFFFFF" }],
+    lines: [{ id: "l2", characterId: "local-youmu", text: "はい" }],
+  };
+  const result = reconcileImportedCharacters(imported, [reimuPinned]);
+  // 妖夢はローカルに残る（id 不変）
+  expect(result.characters).toHaveLength(1);
+  expect(result.characters[0]!.id).toBe("local-youmu");
+  // 行の characterId はそのまま
+  expect(result.lines[0]!.characterId).toBe("local-youmu");
+});
+
+test("reconcileImportedCharacters: 名前 trim 一致（前後空白付き）で同定される", () => {
+  const trimPinned: Character = { id: "p-trim", name: "  霊夢  ", color: "#FF0000" };
+  const imported: Project = {
+    version: 1,
+    projectName: "台本C",
+    characters: [{ id: "local-trim", name: "霊夢", color: "#000000" }],
+    lines: [{ id: "l3", characterId: "local-trim", text: "test" }],
+  };
+  // pinned の名前が "  霊夢  "（trim すると "霊夢"）、imported の名前が "霊夢" → 同定される
+  const result = reconcileImportedCharacters(imported, [trimPinned]);
+  expect(result.characters).toHaveLength(0);
+  expect(result.lines[0]!.characterId).toBe("p-trim");
+});
+
+test("reconcileImportedCharacters: 色違いでも名前一致なら同定（共通優先 = local は characters に追加されない）", () => {
+  const imported: Project = {
+    version: 1,
+    projectName: "台本D",
+    characters: [{ id: "local-reimu2", name: "霊夢", color: "#000000" }], // 色が違う
+    lines: [{ id: "l4", characterId: "local-reimu2", text: "color test" }],
+  };
+  const result = reconcileImportedCharacters(imported, [reimuPinned]);
+  // 名前一致なので同定 → ローカルに含まれない（共通側の色が採用される）
+  expect(result.characters).toHaveLength(0);
+  expect(result.lines[0]!.characterId).toBe("p-reimu");
+});
+
+test("reconcileImportedCharacters: pinned が空なら imported がそのまま返る", () => {
+  const imported: Project = {
+    version: 1,
+    projectName: "台本E",
+    characters: [{ id: "c1", name: "霊夢", color: "#FF6B6B" }],
+    lines: [{ id: "l5", characterId: "c1", text: "no pinned" }],
+  };
+  const result = reconcileImportedCharacters(imported, []);
+  expect(result.characters).toHaveLength(1);
+  expect(result.characters[0]!.id).toBe("c1");
+  expect(result.lines[0]!.characterId).toBe("c1");
+});
+
+test("reconcileImportedCharacters: 同名 imported キャラが複数あっても同じ pinnedId にマップされる", () => {
+  const imported: Project = {
+    version: 1,
+    projectName: "台本F",
+    characters: [
+      { id: "local-reimu-a", name: "霊夢", color: "#111111" },
+      { id: "local-reimu-b", name: "霊夢", color: "#222222" },
+    ],
+    lines: [
+      { id: "l6a", characterId: "local-reimu-a", text: "A" },
+      { id: "l6b", characterId: "local-reimu-b", text: "B" },
+    ],
+  };
+  const result = reconcileImportedCharacters(imported, [reimuPinned]);
+  // どちらの霊夢も同定されローカルには残らない
+  expect(result.characters).toHaveLength(0);
+  // どちらの行も pinnedId に付け替わる
+  expect(result.lines[0]!.characterId).toBe("p-reimu");
+  expect(result.lines[1]!.characterId).toBe("p-reimu");
+});
+
+test("reconcileImportedCharacters: 一部同定・一部ローカル残しが混在するケース", () => {
+  const imported: Project = {
+    version: 1,
+    projectName: "台本G",
+    characters: [
+      { id: "local-reimu3", name: "霊夢", color: "#AABBCC" }, // pinned にある
+      { id: "local-sakuya", name: "咲夜", color: "#CCDDEE" }, // pinned にない
+    ],
+    lines: [
+      { id: "l7a", characterId: "local-reimu3", text: "reimu line" },
+      { id: "l7b", characterId: "local-sakuya", text: "sakuya line" },
+    ],
+  };
+  const result = reconcileImportedCharacters(imported, [reimuPinned, marisaPinned]);
+  // 霊夢はローカルから除外、咲夜はローカルに残る
+  expect(result.characters).toHaveLength(1);
+  expect(result.characters[0]!.name).toBe("咲夜");
+  // 霊夢の行は pinnedId に付け替わる
+  expect(result.lines[0]!.characterId).toBe("p-reimu");
+  // 咲夜の行はそのまま
+  expect(result.lines[1]!.characterId).toBe("local-sakuya");
 });

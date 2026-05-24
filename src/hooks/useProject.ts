@@ -5,7 +5,14 @@ import { generateId } from "../utils/id";
 import { colorForIndex } from "../utils/color";
 import { buildCSV, buildCSVText } from "../utils/csv";
 import { buildMarkdown, parseMarkdown } from "../utils/markdown";
-import { downloadText, parseProjectFile, parseWorkspaceFile, readFileAsText, sanitizeFilename } from "../utils/file";
+import {
+  downloadText,
+  parseProjectFile,
+  parseWorkspaceFile,
+  readFileAsText,
+  reconcileImportedCharacters,
+  sanitizeFilename,
+} from "../utils/file";
 
 /**
  * `localStorage` の旧キー。マイグレーション時にのみ参照する。
@@ -709,10 +716,11 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
     const text = await readFileAsText(file);
     const loaded = parseProjectFile(JSON.parse(text));
     const newId = generateId();
+    // updater 内で pinnedCharacters を参照し、インポート時に共通キャラと照合する（F-128）。
     setWorkspace((w) => ({
       ...w,
       activeId: newId,
-      entries: [...w.entries, { id: newId, project: loaded }],
+      entries: [...w.entries, { id: newId, project: reconcileImportedCharacters(loaded, w.pinnedCharacters) }],
     }));
   }, []);
 
@@ -740,10 +748,11 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
     const text = await readFileAsText(file);
     const { project: parsed, skippedLines } = parseMarkdown(text);
     const newId = generateId();
+    // updater 内で pinnedCharacters を参照し、インポート時に共通キャラと照合する（F-128）。
     setWorkspace((w) => ({
       ...w,
       activeId: newId,
-      entries: [...w.entries, { id: newId, project: parsed }],
+      entries: [...w.entries, { id: newId, project: reconcileImportedCharacters(parsed, w.pinnedCharacters) }],
     }));
     return skippedLines;
   }, []);
