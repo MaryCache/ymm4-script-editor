@@ -94,23 +94,20 @@ characters:
 
 ## デプロイ
 
-`main` への push で GitHub Actions（`.github/workflows/deploy.yml`）が `npm run build` を実行し、GitHub Pages へ自動デプロイします。GitHub Pages のサブパス配信に合わせて Vite の `base` を `/ymm4-script-editor/` に設定しています（ルート配信のホストに移す場合は `base` を `/` に戻してください）。
+`main` への push で GitHub Actions（`.github/workflows/deploy.yml`）が `npm run build` を実行し、GitHub Pages へ自動デプロイします。GitHub Pages のサブパス配信に合わせて Vite の `base` を `/ymm4-script-editor/` に設定しています。
 
 ---
 
 ## ドキュメント
 
-- [**LLM 向け 台本Markdownフォーマット仕様**](docs/llm-script-format.md) — ChatGPT 等に台本を書かせて、そのまま `.md` 取り込みするための指示書（貼り付けテンプレ付き）
-
-設計・仕様は `docs/spec/` にあります（本文＝初版、各文書末尾の「実装差分・追補」が完成品との同期）。
-
-- [要件定義書](docs/spec/requirements.md)（v1.0 + 実装差分 §9）
-- [設計書](docs/spec/design.md)（v1.0 + 実装差分 §10）
-- [Markdown対応 追加仕様](docs/spec/spec-v1.1-markdown.md)（v1.1）
+- [**LLM 向け 台本Markdownフォーマット仕様**](docs/llm-script-format.md) — ChatGPT 等に台本を書かせて、そのまま `.md` で取り込むための指示書（貼り付けテンプレ付き）
+- [要件定義書](docs/spec/requirements.md)
+- [設計書](docs/spec/design.md)
+- [Markdown対応 追加仕様](docs/spec/spec-v1.1-markdown.md)
 - [ADR-001: 技術スタック選定](docs/spec/ADR-001-tech-stack.md)
 
 ---
 
 ## ライセンス
 
-未設定（個人ツール）。再利用・公開ルールを定めたい場合は `LICENSE` を追加してください。
+未設定（個人ツール）。
