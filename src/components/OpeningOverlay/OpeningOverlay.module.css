@@ -1,17 +1,13 @@
 /* OpeningOverlay.module.css
  *
  * opening-sequence (cygames: opening-fade-in + opening-fade-out) +
- * loading-family (loading-fade-in 0.6s / loading-exit 0.8s → ここでは 0.5s に短縮) の最小構成。
+ * loading-family (loading-exit) をベースに、図形モーショングラフィックス
+ * （放射状の衝撃波リング・回転ポリゴン・放射パーティクル）を重ねる。
  *
- * Phase クラス:
- *   .enter  — fade-in: opacity 0→1 + scale 0.96→1 + glow
- *   .idle   — 静止 (opacity: 1)
- *   .exit   — loading-exit: opacity 1→0
- *
- * z-index: 9999 で全 UI より手前。コンテンツ (.app z-index: 1) は下に存在し続ける。
- * pointer-events: none — オーバーレイ消去後もインタラクションを貫通させる。
- *   (短時間演出なので事実上問題ない)
- * prefers-reduced-motion: このコンポーネント自体が reduced では render されない (JS 側でガード済)。
+ * レイヤー（奥→手前）: .burst（図形モーション, z-index:1） → .logo（最前面, z-index:2）
+ * z-index: 9999 で全 UI より手前。コンテンツ (.app z-index:1) は下に存在し続ける。
+ * pointer-events: none — 演出中も下のUIへ操作を貫通させる（短時間なので実害なし）。
+ * prefers-reduced-motion: このコンポーネント自体が reduced では render されない（JS 側でガード済）。
  */
 
 /* ===== ベースオーバーレイ ===== */
@@ -20,62 +16,118 @@
   inset: 0;
   z-index: 9999;
   pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+  display: grid;
+  place-items: center;
   background: #00101d;          /* --bg-0 と同値。token 変数はモジュール外参照不可 */
 }
 
-/* ===== コンテンツ中央 ===== */
+/* ===== 中央スタック（burst と logo を重ねる）===== */
 .content {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 16px;
-  /* アニメーションは .content に適用 (overlay 全体の不透明度は JS でクラス切替) */
-  transform-origin: center;
+  position: relative;
+  display: grid;
+  place-items: center;
+  /* 全体の淡いフェードイン。図形を歪めないよう opacity のみ。 */
+  width: 480px;
+  height: 480px;
+}
+.enter .content { animation: openingFadeIn 0.4s ease-out both; }
+.idle .content { opacity: 1; }
+
+@keyframes openingFadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
 }
 
-/* ===== タイトルロゴ画像（OP はこれ単体） ===== */
+/* ===== 図形モーション層（中心基準・ロゴより背面）===== */
+.burst {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  z-index: 1;
+  pointer-events: none;
+}
+
+/* 衝撃波リング: 中心から width/height を広げながらフェード。translate(-50%,-50%) で常に中心。
+ * 3枚を nth-child で時間差発火し、波紋のように広がる。 */
+.ring {
+  position: absolute;
+  top: 0;
+  left: 0;
+  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+  border: 1.5px solid rgba(43, 180, 230, 0.55);
+  border-radius: 50%;
+  opacity: 0;
+  animation: ringExpand 0.95s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+.ring:nth-child(1) { animation-delay: 0ms; }
+.ring:nth-child(2) { animation-delay: 130ms; border-color: rgba(88, 211, 240, 0.45); }
+.ring:nth-child(3) { animation-delay: 260ms; border-color: rgba(16, 125, 200, 0.4); }
+
+@keyframes ringExpand {
+  0%   { width: 0; height: 0; opacity: 0; }
+  12%  { opacity: 0.55; }
+  100% { width: 680px; height: 680px; opacity: 0; }
+}
+
+/* 回転ポリゴン: ゆっくり回りながら拡大・消滅する六角形線画 */
+.poly {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 150px;
+  height: 150px;
+  opacity: 0;
+  filter: drop-shadow(0 0 6px rgba(43, 180, 230, 0.4));
+  animation: polySpin 1s ease-out forwards;
+}
+@keyframes polySpin {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(0deg)  scale(0.3); }
+  25%  { opacity: 0.5; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(80deg) scale(1.7); }
+}
+
+/* 放射パーティクル: 中心から各方向へ飛び散る粒。
+ * translate(-50%,-50%) で中心 → rotate(--angle) で向き → translateY(-dist) で外へ。 */
+.particle {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: var(--size, 3px);
+  height: var(--size, 3px);
+  border-radius: 50%;
+  background: #58d3f0;
+  box-shadow: 0 0 6px rgba(88, 211, 240, 0.85);
+  opacity: 0;
+  animation: particleFly 0.9s cubic-bezier(0.12, 0.8, 0.3, 1) var(--delay, 0ms) forwards;
+}
+@keyframes particleFly {
+  0%   { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) translateY(0) scale(1); }
+  12%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(var(--angle)) translateY(calc(-1 * var(--dist))) scale(0.3); }
+}
+
+/* ===== タイトルロゴ（最前面）===== */
 .logo {
+  position: relative;
+  z-index: 2;
   width: 400px;
   max-width: 80vw;
   height: auto;
-  /* 暗い空間に浮かぶよう、画像のシアンに合わせた柔らかいグローを付与 */
   filter: drop-shadow(0 0 22px rgba(43, 180, 230, 0.4));
+  /* 放射が始まった少し後に浮かび上がる */
+  animation: logoIn 0.6s cubic-bezier(0.16, 1, 0.3, 1) 0.22s both;
 }
-
-/* ===== opening-fade-in (enter フェーズ) ===== */
-/* opacity 0→1 + scale 0.96→1 + glow 強調。0.5s, --ease-out 近似 */
-.enter .content {
-  animation: openingFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
-}
-
-@keyframes openingFadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.96);
-    filter: drop-shadow(0 0 0 rgba(43, 180, 230, 0));
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-    filter: drop-shadow(0 0 22px rgba(43, 180, 230, 0.7));
-  }
-}
-
-/* ===== idle フェーズ: 静止 ===== */
-.idle .content {
-  opacity: 1;
-  transform: scale(1);
+@keyframes logoIn {
+  from { opacity: 0; transform: scale(0.86); }
+  to   { opacity: 1; transform: scale(1); }
 }
 
 /* ===== loading-exit (exit フェーズ) ===== */
-/* opacity 1→0。0.5s, ease-in。overlay 全体をフェードアウト */
-.exit {
-  animation: loadingExit 0.5s ease-in both;
-}
-
+.exit { animation: loadingExit 0.5s ease-in both; }
 @keyframes loadingExit {
   from { opacity: 1; }
   to   { opacity: 0; }
