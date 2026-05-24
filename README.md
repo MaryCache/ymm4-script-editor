@@ -98,6 +98,17 @@ characters:
 
 ---
 
+## ドキュメント
+
+設計・仕様は `docs/spec/` にあります（本文＝初版、各文書末尾の「実装差分・追補」が完成品との同期）。
+
+- [要件定義書](docs/spec/requirements.md)（v1.0 + 実装差分 §9）
+- [設計書](docs/spec/design.md)（v1.0 + 実装差分 §10）
+- [Markdown対応 追加仕様](docs/spec/spec-v1.1-markdown.md)（v1.1）
+- [ADR-001: 技術スタック選定](docs/spec/ADR-001-tech-stack.md)
+
+---
+
 ## ライセンス
 
 未設定（個人ツール）。再利用・公開ルールを定めたい場合は `LICENSE` を追加してください。
