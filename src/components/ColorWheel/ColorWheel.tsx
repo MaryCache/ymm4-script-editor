@@ -49,8 +49,9 @@ const clamp = (val: number, min: number, max: number): number => Math.max(min, M
  * ポインター座標（要素中心基準）から色相角（0–360）を算出するヘルパー。
  *
  * @remarks
- * CSS `conic-gradient(from -90deg, ...)` で 0deg=12時方向・時計回りと定義しているため、
- * atan2 の戻り値（0deg=3時方向・反時計回り）から 90deg を加算して向きを合わせる。
+ * リング（`conic-gradient(from 0deg, ...)`）・マーカー（`rotate(h)`）はいずれも
+ * 「12時=hue 0・時計回り」で定義しているため、atan2 の戻り値（0deg=3時方向）から
+ * 90deg を加算して向きを合わせる（12時を 0、時計回りに増加させる）。
  *
  * @param cx - ポインターの x 座標（要素中心を 0 とした相対値）
  * @param cy - ポインターの y 座標（要素中心を 0 とした相対値、y 軸下向き正）
@@ -246,8 +247,8 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   const currentHex = hsvToHex(hsv.h, hsv.s, hsv.v);
 
   // ===== 色相マーカーの角度（CSS rotate に使用）=====
-  // conic-gradient は from -90deg（12時=赤）で開始、時計回り正。
-  // hsv.h=0 → マーカーは 12時位置（-90deg）、hsv.h=90 → 3時位置（0deg）…
+  // リング conic-gradient は from 0deg（12時=赤）で開始、時計回り正。
+  // hsv.h=0 → マーカーは 12時位置、hsv.h=90 → 3時位置…
   // rotate(deg) で div の 12時方向を基点に hue 分回す。
   // marker div は translateY(-RING_MID_R) で上端（12時）に突き出す形にするため:
   //   transform: rotate(hue deg) → hue=0 は 12時 → 正しい

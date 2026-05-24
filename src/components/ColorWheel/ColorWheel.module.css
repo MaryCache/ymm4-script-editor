@@ -58,9 +58,12 @@
 .ring {
   /* width / height は JS から注入（RING_OUTER px）。 */
   border-radius: 50%;
-  /* 色相グラデーション: conic-gradient の from -90deg で 12時=赤（hue 0）、時計回り。 */
+  /* 色相グラデーション: conic-gradient の from 0deg で 12時=赤（hue 0）、時計回り。
+     Why from 0deg（not -90deg）: マーカー配置（rotate(h)・12時=h0）とポインタ→hue 変換
+     （angleFromCenter・12時=0）がどちらも「12時=hue0・時計回り」なので、リングの
+     見た目も同じ基準に揃える。from -90deg だと見た目だけ90°ずれ、赤を指しても紫になる。 */
   background: conic-gradient(
-    from -90deg,
+    from 0deg,
     hsl(0, 100%, 50%),
     hsl(30, 100%, 50%),
     hsl(60, 100%, 50%),
