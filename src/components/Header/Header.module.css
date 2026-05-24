@@ -42,27 +42,14 @@
   flex-shrink: 0;
 }
 
-/* Brand mark: gradient updated to cyan system (item 1) */
-.brandMark {
-  width: 26px; height: 26px;
-  border-radius: 7px;
-  /* cyan gradient: #107dc8 → #2bb4e6 → accent of #ef5d75 for warmth contrast */
-  background: linear-gradient(135deg, #107dc8 0%, #2bb4e6 55%, #58d3f0 110%);
-  background-size: 200% 200%;
-  animation: brandShift 11s ease-in-out infinite;
-  display: grid; place-items: center;
-  font-weight: 700; font-size: 11px; color: #001420;
-  letter-spacing: -0.02em;
-  box-shadow:
-    0 1px 0 rgba(255, 255, 255, 0.25) inset,
-    0 0 0 1px rgba(255, 255, 255, 0.06),
-    0 6px 18px -6px rgba(16, 125, 200, 0.55);
+/* Brand: ユーザー提供のタイトルロゴ画像（横ロゴ。薄い装飾ドットを除きワードマークにトリム済み）。
+ * 52px ヘッダーに収まる高さで表示。微かなシアンのグローを付与。 */
+.brandLogo {
+  height: 30px;
+  width: auto;
+  display: block;
   flex-shrink: 0;
-}
-
-@keyframes brandShift {
-  0%, 100% { background-position: 0% 50%; }
-  50%       { background-position: 100% 50%; }
+  filter: drop-shadow(0 0 6px rgba(43, 180, 230, 0.25));
 }
 
 .brandSep {

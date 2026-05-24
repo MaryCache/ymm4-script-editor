@@ -148,8 +148,8 @@ export function Header(props: HeaderProps) {
     <header className={styles.header} ref={headerRef} onKeyDown={handleKeyDown}>
       {/* ===== Left: brand mark + project name ===== */}
       <div className={styles.brand}>
-        {/* aria-hidden: 純粋な装飾ロゴ。スクリーンリーダーに読ませない。 */}
-        <div className={styles.brandMark} aria-hidden="true">Y4</div>
+        {/* ユーザー提供のタイトルロゴ画像。装飾なので alt は空 + aria-hidden。 */}
+        <img className={styles.brandLogo} src="/header-logo.png" alt="" aria-hidden="true" />
         <div className={styles.brandSep} aria-hidden="true" />
         <input
           className={styles.projectName}
