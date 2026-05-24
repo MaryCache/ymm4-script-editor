@@ -310,7 +310,14 @@ describe("退場ゴースト位置・ライフサイクル（reduced=false / fak
 
   test("中間タブ削除時: ゴーストが元の位置（t1 の次・t3 の前）に出現する", async () => {
     const { rerender } = render(
-      <ProjectTabs tabs={[tab1, tab2, tab3]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+      <ProjectTabs
+        tabs={[tab1, tab2, tab3]}
+        activeId="t1"
+        onSwitch={noop}
+        onNew={noop}
+        onClose={noop}
+        onRename={noop}
+      />,
     );
 
     // t2 を削除した props で再レンダー（App の状態更新をシミュレート）
@@ -338,9 +345,13 @@ describe("退場ゴースト位置・ライフサイクル（reduced=false / fak
     const children = Array.from(tabList.children);
 
     // children は [t1-tabItem, ghost, t3-tabItem, newBtn] の順になるはず
-    const t1Idx = children.findIndex((el) => el.textContent?.includes("プロジェクト1") && el.className.includes("tabItem"));
+    const t1Idx = children.findIndex(
+      (el) => el.textContent?.includes("プロジェクト1") && el.className.includes("tabItem"),
+    );
     const ghostIdx = children.indexOf(ghost);
-    const t3Idx = children.findIndex((el) => el.textContent?.includes("プロジェクト3") && el.className.includes("tabItem"));
+    const t3Idx = children.findIndex(
+      (el) => el.textContent?.includes("プロジェクト3") && el.className.includes("tabItem"),
+    );
 
     expect(t1Idx).toBeGreaterThanOrEqual(0);
     expect(ghostIdx).toBeGreaterThanOrEqual(0);
@@ -352,7 +363,14 @@ describe("退場ゴースト位置・ライフサイクル（reduced=false / fak
 
   test("末尾タブ削除時: ゴーストが末尾（＋ の手前）に出現する", async () => {
     const { rerender } = render(
-      <ProjectTabs tabs={[tab1, tab2, tab3]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
+      <ProjectTabs
+        tabs={[tab1, tab2, tab3]}
+        activeId="t1"
+        onSwitch={noop}
+        onNew={noop}
+        onClose={noop}
+        onRename={noop}
+      />,
     );
 
     // t3（末尾）を削除した props で再レンダー
@@ -385,9 +403,7 @@ describe("退場ゴースト位置・ライフサイクル（reduced=false / fak
     );
 
     await act(async () => {
-      rerender(
-        <ProjectTabs tabs={[tab1]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />,
-      );
+      rerender(<ProjectTabs tabs={[tab1]} activeId="t1" onSwitch={noop} onNew={noop} onClose={noop} onRename={noop} />);
       await Promise.resolve();
     });
 

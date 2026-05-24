@@ -70,6 +70,7 @@ const validWs: Workspace = {
   version: 1,
   activeId: "entry-1",
   entries: [validEntry],
+  pinnedCharacters: [],
 };
 
 test("parseWorkspaceFile: 正常なワークスペースはそのまま返す", () => {
@@ -81,7 +82,7 @@ test("parseWorkspaceFile: 複数エントリでも正常に返す", () => {
     id: "entry-2",
     project: { version: 1, projectName: "P2", characters: [], lines: [] } satisfies Project,
   };
-  const ws: Workspace = { version: 1, activeId: "entry-2", entries: [validEntry, entry2] };
+  const ws: Workspace = { version: 1, activeId: "entry-2", entries: [validEntry, entry2], pinnedCharacters: [] };
   expect(parseWorkspaceFile(ws)).toEqual(ws);
 });
 
@@ -122,4 +123,39 @@ test("parseWorkspaceFile: null は例外", () => {
 test("parseWorkspaceFile: 非オブジェクトは例外", () => {
   expect(() => parseWorkspaceFile("nope")).toThrow();
   expect(() => parseWorkspaceFile(42)).toThrow();
+});
+
+// ===== v1.4 pinnedCharacters マイグレーション =====
+
+test("parseWorkspaceFile: pinnedCharacters 欠落（旧形式）→ [] にマイグレーション", () => {
+  // pinnedCharacters キーなし（旧ワークスペース）
+  const oldWs = { version: 1, activeId: "entry-1", entries: validWs.entries };
+  const result = parseWorkspaceFile(oldWs);
+  expect(result.pinnedCharacters).toEqual([]);
+});
+
+test("parseWorkspaceFile: pinnedCharacters が正常な Character[] なら採用する", () => {
+  const ws = {
+    ...validWs,
+    pinnedCharacters: [{ id: "p1", name: "レミリア", color: "#C792EA" }],
+  };
+  const result = parseWorkspaceFile(ws);
+  expect(result.pinnedCharacters).toHaveLength(1);
+  expect(result.pinnedCharacters[0]!.name).toBe("レミリア");
+});
+
+test("parseWorkspaceFile: pinnedCharacters が不正な要素を含む場合は例外", () => {
+  const ws = {
+    ...validWs,
+    pinnedCharacters: [{ id: "p1", name: 123, color: "#C792EA" }], // name が number
+  };
+  expect(() => parseWorkspaceFile(ws)).toThrow();
+});
+
+test("parseWorkspaceFile: pinnedCharacters が配列でない場合は例外", () => {
+  const ws = {
+    ...validWs,
+    pinnedCharacters: "not-an-array",
+  };
+  expect(() => parseWorkspaceFile(ws)).toThrow();
 });

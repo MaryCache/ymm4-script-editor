@@ -118,6 +118,7 @@ test("workspaceキーに有効なワークスペースがあれば復元する",
     version: 1,
     activeId: id,
     entries: [{ id, project: { version: 1, projectName: "復元テスト", characters: [], lines: [] } }],
+    pinnedCharacters: [],
   };
   localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(ws));
   const { result } = renderHook(() => useProject());
@@ -144,6 +145,7 @@ test("workspaceキー優先（旧キーも存在する場合はworkspaceキー�
     version: 1,
     activeId: id,
     entries: [{ id, project: { version: 1, projectName: "ワークスペース側", characters: [], lines: [] } }],
+    pinnedCharacters: [],
   };
   localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(ws));
   localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, projectName: "旧キー側", characters: [], lines: [] }));
@@ -610,4 +612,377 @@ test("localStorage.setItem が成功しているとき onPersistError は呼ば�
 test("useProject() を引数なしで呼んでも後方互換（既存テストと同じ動作）", () => {
   const { result } = renderHook(() => useProject());
   expect(result.current.project.projectName).toBe("新規プロジェクト");
+});
+
+// ===== v1.4 共通キャラ（pinnedCharacters）=====
+
+test("初期状態: pinnedCharacters は空、characters（実効）もローカルと一致", () => {
+  const { result } = renderHook(() => useProject());
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+  act(() => result.current.addCharacter("霊夢"));
+  expect(result.current.characters).toHaveLength(1);
+  expect(result.current.characters[0]!.name).toBe("霊夢");
+});
+
+test("pinCharacter: ローカルキャラを共通プールへ移動する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+  expect(result.current.pinnedCharacters).toHaveLength(1);
+  expect(result.current.pinnedCharacters[0]!.name).toBe("霊夢");
+  expect(result.current.project.characters).toHaveLength(0);
+});
+
+test("pinCharacter: 既に共通なら no-op", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+  act(() => result.current.pinCharacter(id)); // 2回目は no-op
+  expect(result.current.pinnedCharacters).toHaveLength(1);
+});
+
+test("unpinCharacter: 共通キャラをローカルへ移動する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+  act(() => result.current.unpinCharacter(id));
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+  expect(result.current.project.characters).toHaveLength(1);
+  expect(result.current.project.characters[0]!.name).toBe("霊夢");
+});
+
+test("unpinCharacter: 共通にいなければ no-op", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.unpinCharacter(id)); // 共通にいない
+  expect(result.current.project.characters).toHaveLength(1);
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+});
+
+test("実効一覧（characters）は [共通, ...ローカル] の順", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("魔理沙"));
+  const reimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(reimuId));
+  // 共通: 霊夢、ローカル: 魔理沙
+  expect(result.current.characters[0]!.name).toBe("霊夢");
+  expect(result.current.characters[1]!.name).toBe("魔理沙");
+});
+
+test("renameCharacter: 共通キャラの名前は全タブ反映（共通を更新）", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+  act(() => result.current.renameCharacter(id, "博麗霊夢"));
+  expect(result.current.pinnedCharacters[0]!.name).toBe("博麗霊夢");
+});
+
+test("renameCharacter: ローカルキャラの名前はローカルのみ更新", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("魔理沙"));
+  const marisaId = result.current.project.characters[1]!.id;
+  act(() => result.current.renameCharacter(marisaId, "霧雨魔理沙"));
+  expect(result.current.project.characters[1]!.name).toBe("霧雨魔理沙");
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+});
+
+test("setCharacterColor: 共通キャラの色は全タブ反映", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+  act(() => result.current.setCharacterColor(id, "#abcdef"));
+  expect(result.current.pinnedCharacters[0]!.color).toBe("#abcdef");
+});
+
+test("deleteCharacter: 共通キャラ削除で全プロジェクトのラインを付け替える", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("魔理沙"));
+  const reimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(reimuId));
+  act(() => result.current.addLineAtEnd()); // 先頭キャラ=共通の霊夢
+  act(() => result.current.deleteCharacter(reimuId)); // 共通から除去
+  // ラインの characterId が付け替えられている（魔理沙）
+  const marisaId = result.current.project.characters[0]!.id;
+  expect(result.current.project.lines[0]!.characterId).toBe(marisaId);
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+});
+
+test("deleteCharacter: 実効一覧が1以下なら no-op（共通1+ローカル0）", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+  // 実効一覧: [共通の霊夢] = 1件
+  act(() => result.current.deleteCharacter(id));
+  expect(result.current.pinnedCharacters).toHaveLength(1);
+});
+
+test("マイグレーション: pinnedCharacters 欠落のワークスペースを復元すると [] になる", () => {
+  const id = "migrated-id";
+  // pinnedCharacters を含まない旧形式
+  const oldWs = {
+    version: 1,
+    activeId: id,
+    entries: [{ id, project: { version: 1, projectName: "旧プロジェクト", characters: [], lines: [] } }],
+  };
+  localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(oldWs));
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("旧プロジェクト");
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+});
+
+test("saveToFile: materialize - 参照されている共通キャラのみ books/export に含まれる（localStorage 書き出し内容で確認）", () => {
+  // saveToFile の materialize を間接的に確認する。
+  // downloadText → downloadBlob → URL.createObjectURL の呼び出し経路を stub する。
+  const blobContents: Blob[] = [];
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  URL.createObjectURL = (blob: Blob) => {
+    blobContents.push(blob);
+    return "blob:stub";
+  };
+  URL.revokeObjectURL = () => {};
+
+  // anchor 要素の click を no-op にする（document.createElement("a") ではなく body.click でも可）
+  const anchorClickSpy = vi.fn();
+  const originalBodyAppendChild = document.body.appendChild.bind(document.body);
+  const originalBodyRemoveChild = document.body.removeChild.bind(document.body);
+  vi.spyOn(document.body, "appendChild").mockImplementation((node) => {
+    if (node instanceof HTMLAnchorElement) {
+      vi.spyOn(node, "click").mockImplementation(anchorClickSpy);
+    }
+    return originalBodyAppendChild(node);
+  });
+  vi.spyOn(document.body, "removeChild").mockImplementation((node) => originalBodyRemoveChild(node));
+
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢")); // ローカル
+  act(() => result.current.addCharacter("魔理沙")); // ローカル
+  const reimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(reimuId)); // 霊夢を共通に
+  act(() => result.current.addLineAtEnd()); // 先頭=共通の霊夢
+
+  act(() => result.current.saveToFile());
+
+  URL.createObjectURL = originalCreateObjectURL;
+  URL.revokeObjectURL = originalRevokeObjectURL;
+  vi.restoreAllMocks();
+
+  expect(blobContents).toHaveLength(1);
+  const fileText = new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blobContents[0]!);
+  });
+
+  return fileText.then((text) => {
+    const parsed = JSON.parse(text);
+    const charNames: string[] = parsed.characters.map((c: { name: string }) => c.name);
+    // 霊夢（共通・参照あり）と魔理沙（ローカル）が含まれる
+    expect(charNames).toContain("霊夢");
+    expect(charNames).toContain("魔理沙");
+  });
+});
+
+test("pinnedCharacters: 旧キーからマイグレーション時に pinnedCharacters=[] が付く", () => {
+  localStorage.clear();
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ version: 1, projectName: "旧プロジェクト2", characters: [], lines: [] }),
+  );
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("旧プロジェクト2");
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+});
+
+// ===== v1.4 レビュー指摘テスト（ギャップ埋め）=====
+
+// テスト1: H-1 unpinCharacter — 他プロジェクトのラインが孤児化しない
+test("unpinCharacter: 複数プロジェクトが共通キャラを参照 → unpin でアクティブ以外のラインが fallback へ付け替わる", () => {
+  const { result } = renderHook(() => useProject());
+
+  // P1 にキャラ（ローカル）と行を追加
+  act(() => result.current.addCharacter("霊夢"));
+  const reimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.addLineAtEnd());
+
+  // 霊夢を共通へ
+  act(() => result.current.pinCharacter(reimuId));
+  const p1Id = result.current.activeId;
+
+  // P2 を追加し、共通の霊夢を話者とする行を追加
+  act(() => result.current.newProject());
+  const p2Id = result.current.activeId;
+  act(() => result.current.addLineAtEnd()); // 先頭=共通の霊夢
+
+  // P1 に戻ってから unpin（P1 がアクティブ）
+  act(() => result.current.switchProject(p1Id));
+  act(() => result.current.unpinCharacter(reimuId));
+
+  // 共通プールから除去されている
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+
+  // アクティブ(P1) のラインはローカルへ移動した霊夢をそのまま参照している
+  const p1Lines = result.current.project.lines;
+  expect(p1Lines[0]!.characterId).toBe(reimuId);
+
+  // P2 のラインは霊夢 id を参照できなくなるため fallback へ付け替わっている（孤児化しない）
+  act(() => result.current.switchProject(p2Id));
+  const p2Lines = result.current.project.lines;
+  // fallback = P2 の実効一覧先頭。P2 には共通も残らずローカルキャラもいないため ""
+  expect(p2Lines[0]!.characterId).not.toBe(reimuId);
+});
+
+test("unpinCharacter: アクティブのラインは移動キャラ id を参照し続ける（付け替えない）", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("魔理沙"));
+  const marisaId = result.current.project.characters[0]!.id;
+  act(() => result.current.addLineAtEnd()); // 先頭=魔理沙
+  act(() => result.current.pinCharacter(marisaId)); // 共通へ
+
+  // unpin（アクティブのまま）
+  act(() => result.current.unpinCharacter(marisaId));
+
+  // アクティブの行は移動先ローカルの魔理沙を参照している
+  expect(result.current.project.lines[0]!.characterId).toBe(marisaId);
+  expect(result.current.project.characters[0]!.id).toBe(marisaId);
+});
+
+// テスト2: M-1 isEmpty — pinnedCharacters があっても固有コンテンツ0なら isEmpty=true
+test("isEmpty: ローカルキャラ0・行0 だが pinnedCharacters あり → isEmpty=true（M-1 修正）", () => {
+  const { result } = renderHook(() => useProject());
+  // まず別タブでキャラを追加してピン
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(id));
+
+  // 新規タブを追加（ローカルキャラ0・行0）
+  act(() => result.current.newProject());
+
+  // アクティブタブは行もローカルキャラも0 → isEmpty=true
+  expect(result.current.tabs.find((t) => t.id === result.current.activeId)!.isEmpty).toBe(true);
+  // pinnedCharacters は存在するが isEmpty に影響しない
+  expect(result.current.pinnedCharacters).toHaveLength(1);
+});
+
+// テスト3: deleteCharacter 共通 — 複数プロジェクトのラインを正しく fallback へ
+test("deleteCharacter: 共通キャラ削除で複数プロジェクトのラインが fallback へ付け替わる（無関係なラインは維持）", () => {
+  const { result } = renderHook(() => useProject());
+
+  // P1: 霊夢（共通予定）と魔理沙（ローカル）を追加し行を2本
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("魔理沙"));
+  const reimuId = result.current.project.characters[0]!.id;
+  const marisaId = result.current.project.characters[1]!.id;
+  act(() => result.current.addLineAtEnd()); // 先頭=霊夢（後でピン）
+  act(() => result.current.addLineAtEnd()); // 霊夢
+  act(() => result.current.updateLineCharacter(result.current.project.lines[1]!.id, marisaId)); // 2行目=魔理沙
+
+  // 霊夢を共通へ
+  act(() => result.current.pinCharacter(reimuId));
+  const p1Id = result.current.activeId;
+
+  // P2: 共通の霊夢を話者とする行
+  act(() => result.current.newProject());
+  act(() => result.current.addLineAtEnd()); // 先頭=共通の霊夢
+
+  // P1 に戻って霊夢（共通）を削除
+  act(() => result.current.switchProject(p1Id));
+  act(() => result.current.deleteCharacter(reimuId));
+
+  // 共通プールが空に
+  expect(result.current.pinnedCharacters).toHaveLength(0);
+
+  // P1 の霊夢参照ラインが魔理沙（fallback）に付け替わっている
+  const p1Line0 = result.current.project.lines[0]!;
+  expect(p1Line0.characterId).toBe(marisaId);
+  // P1 の魔理沙参照ラインは変わらない（無関係なラインは維持）
+  const p1Line1 = result.current.project.lines[1]!;
+  expect(p1Line1.characterId).toBe(marisaId);
+});
+
+// テスト4: materialize — 未参照の共通キャラは書き出しに含まれない
+test("saveToFile: materialize — 未参照の共通キャラは書き出しに含まれない", () => {
+  const blobContents: Blob[] = [];
+  const originalCreateObjectURL = URL.createObjectURL;
+  const originalRevokeObjectURL = URL.revokeObjectURL;
+  URL.createObjectURL = (blob: Blob) => {
+    blobContents.push(blob);
+    return "blob:stub";
+  };
+  URL.revokeObjectURL = () => {};
+
+  const anchorClickSpy = vi.fn();
+  const originalBodyAppendChild = document.body.appendChild.bind(document.body);
+  const originalBodyRemoveChild = document.body.removeChild.bind(document.body);
+  vi.spyOn(document.body, "appendChild").mockImplementation((node) => {
+    if (node instanceof HTMLAnchorElement) {
+      vi.spyOn(node, "click").mockImplementation(anchorClickSpy);
+    }
+    return originalBodyAppendChild(node);
+  });
+  vi.spyOn(document.body, "removeChild").mockImplementation((node) => originalBodyRemoveChild(node));
+
+  const { result } = renderHook(() => useProject());
+  // 霊夢（共通・参照あり）と妖夢（共通・参照なし）
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("妖夢"));
+  const reimuId = result.current.project.characters[0]!.id;
+  const youmuId = result.current.project.characters[1]!.id;
+  act(() => result.current.pinCharacter(reimuId));
+  act(() => result.current.pinCharacter(youmuId));
+  // 霊夢のみ行で参照する
+  act(() => result.current.addLineAtEnd()); // 先頭=共通の霊夢
+
+  act(() => result.current.saveToFile());
+
+  URL.createObjectURL = originalCreateObjectURL;
+  URL.revokeObjectURL = originalRevokeObjectURL;
+  vi.restoreAllMocks();
+
+  expect(blobContents).toHaveLength(1);
+  const fileText = new Promise<string>((resolve) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(blobContents[0]!);
+  });
+
+  return fileText.then((text) => {
+    const parsed = JSON.parse(text);
+    const charNames: string[] = parsed.characters.map((c: { name: string }) => c.name);
+    // 霊夢（参照あり）は含まれる
+    expect(charNames).toContain("霊夢");
+    // 妖夢（参照なし）は含まれない（否定側アサーション）
+    expect(charNames).not.toContain("妖夢");
+  });
+});
+
+// テスト5: CSV/コピー — 共通キャラを話者にした行の名前が解決される
+test("exportCSVToClipboard: 共通キャラを話者にした行の CSV で名前が解決される", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.assign(navigator, { clipboard: { writeText } });
+
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const reimuId = result.current.project.characters[0]!.id;
+  act(() => result.current.pinCharacter(reimuId)); // 共通へ
+  act(() => result.current.addLineAtEnd()); // 先頭=共通の霊夢
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "おは！"));
+
+  await act(async () => {
+    await result.current.exportCSVToClipboard();
+  });
+
+  // 話者名「霊夢」がCSVに解決されている
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining("霊夢"));
+  expect(writeText).toHaveBeenCalledWith(expect.stringContaining("おは！"));
 });

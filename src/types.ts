@@ -110,6 +110,7 @@ export type WorkspaceEntry = {
  * 不変条件:
  * - `entries.length >= 1`（常に最低1エントリ）
  * - `activeId` は必ず `entries` のいずれかの `id` を指す
+ * - `pinnedCharacters` の各 id は、どのプロジェクトのローカルキャラとも重複しない（移動であってコピーでない）
  *
  * `version: 1` はスキーマバージョン識別子。将来の破壊的変更に備えたリテラル型。
  *
@@ -122,4 +123,13 @@ export type Workspace = {
   activeId: string;
   /** タブとして保持するプロジェクトエントリ一覧。1つ以上。 */
   entries: WorkspaceEntry[];
+  /**
+   * 全プロジェクト共有の共通キャラクター一覧（v1.4 追加）。
+   *
+   * @remarks
+   * ピン（固定）されたキャラクターはここに移動し、全タブ・新規タブでデフォルトで使える。
+   * 実効キャラ一覧 = `[...pinnedCharacters, ...activeProject.characters]`（共通が先）。
+   * 欠落時は `[]` にマイグレーションされる（後方互換）。
+   */
+  pinnedCharacters: Character[];
 };

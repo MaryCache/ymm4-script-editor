@@ -53,6 +53,11 @@
 リスト操作（追加・削除・並べ替え）と Claude Code の相性において圧倒的に有利。  
 軽量性よりも **AI補助品質 × 実装シンプルさ** を優先した。
 
+> **追補（2026-05-25・実装時点）: React Compiler 有効化**  
+> `@vitejs/plugin-react` v6 は Oxc ベースで `babel` オプションが廃止されたため、`@rolldown/plugin-babel` + `reactCompilerPreset()`（peer: `@babel/core` / `babel-plugin-react-compiler`）で React Compiler を組み込んでいる（`vite.config.ts`）。target は React 19。  
+> これにより NF-10 向けの手動メモ化（`LineRow` の `memo()`、`useProject` の `useCallback([])`）は Compiler の自動メモ化で裏打ちされる。`eslint-plugin-react-hooks` v7 の `preserve-manual-memoization` 前提と実ビルドが一致。  
+> 詳細は `design.md §10.13`。
+
 ---
 
 ### スタイリング: **Plain CSS + CSS Variables**
@@ -123,12 +128,14 @@
 ## 最終スタック
 
 ```
-Vite 6 + React 19 + TypeScript (strict)
+Vite 8 + React 19 + TypeScript (strict)
+React Compiler (@rolldown/plugin-babel + babel-plugin-react-compiler)
 Plain CSS + CSS Modules
 vite-plugin-pwa (Workbox)
 localStorage + File API
 ```
 
 > 注（2026-05-24・実装時点）: 実際の構築は **Vite 8 系**（scaffold の最新版）で行った。
-> 上記「Vite 6」は採択時点の表記。方針（Vite を採用）は不変。
+> 上記当初表記「Vite 6」は採択時点の表記。方針（Vite を採用）は不変。
+> React Compiler は 2026-05-25 に組み込み（`vite.config.ts`）。
 > 完成品の実スタック詳細は `design.md §10` を参照。

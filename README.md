@@ -17,7 +17,7 @@ YukkuriMovieMaker4（YMM4）向けの解説・ゆっくり動画の**台本（�
   - **Markdown**（フロントマター付き完全形式の入出力。AI に台本生成を依頼 → そのまま読み込む用途に対応）
 - **自動保存** — 編集内容を localStorage に自動保存し、次回起動時に復元。
 - **PWA** — オフライン動作・デスクトップインストール対応。インストール時は Window Controls Overlay でネイティブウィンドウ風の外観に。
-- **動作演出** — 起動オープニング、行入れ替えの FLIP アニメ、独自スタイルのキャラ選択ドロップダウン、スクロール促し／一番上に戻る、背景モーションなど。すべて `prefers-reduced-motion` を尊重。
+- **動作演出** — 起動オープニング、行入れ替えの FLIP アニメ、独自スタイルのキャラ選択ドロップダウン、スクロール促し／一番上に戻る、背景モーション、タブの appear-slide 追加・ゴーストフェード退場・FLIP グライドなど。すべて `prefers-reduced-motion` を尊重。
 
 ---
 
@@ -27,6 +27,7 @@ YukkuriMovieMaker4（YMM4）向けの解説・ゆっくり動画の**台本（�
 |---|---|
 | ビルド | Vite |
 | UI | React 19 + TypeScript（strict / `noUncheckedIndexedAccess` / `verbatimModuleSyntax`） |
+| 最適化 | React Compiler（`@rolldown/plugin-babel` + `babel-plugin-react-compiler`） |
 | スタイル | Plain CSS + CSS Modules（外部 UI/フォント依存なし） |
 | PWA | vite-plugin-pwa（Workbox） |
 | 永続化 | localStorage + File API |
@@ -107,6 +108,7 @@ characters:
 - [追加仕様 v1.1: Markdown 対応](docs/spec/spec-v1.1-markdown.md)
 - [追加仕様 v1.2: コピペインポート / キャラ編集 / 全行リセット](docs/spec/spec-v1.2-paste-and-character-edit.md)
 - [追加仕様 v1.3: プロジェクトタブ（複数台本管理）](docs/spec/spec-v1.3-multi-project-tabs.md)
+- [追加仕様 v1.4: 共通キャラ設定（ピン / 全プロジェクト共有）](docs/spec/spec-v1.4-shared-characters.md)
 
 ---
 

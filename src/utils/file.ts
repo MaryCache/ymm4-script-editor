@@ -163,6 +163,7 @@ const isWorkspaceEntry = (v: unknown): v is WorkspaceEntry => {
  * - `activeId` が string
  * - `entries` が 1 つ以上の `WorkspaceEntry` 配列（各 entry は `parseProjectFile` を通過）
  * - `activeId` が `entries` のいずれかの `id` と一致する
+ * - `pinnedCharacters` が存在すれば `Character[]` として検証（欠落時は `[]` にマイグレーション）
  *
  * @param raw - `JSON.parse` で得た未知の値
  * @returns 検証済みの `Workspace` オブジェクト
@@ -180,5 +181,16 @@ export const parseWorkspaceFile = (raw: unknown): Workspace => {
     throw new Error("entries が不正です");
   const entries = obj.entries as WorkspaceEntry[];
   if (!entries.some((e) => e.id === obj.activeId)) throw new Error("activeId が entries に存在しません");
-  return { version: 1, activeId: obj.activeId, entries };
+
+  // pinnedCharacters: v1.4 追加フィールド。欠落時は [] にマイグレーション。
+  // 配列だが要素不正（isCharacter 不通過）なら既定ワークスペースへフォールバックさせるため例外を投げる。
+  let pinnedCharacters: Character[] = [];
+  if (obj.pinnedCharacters !== undefined) {
+    if (!Array.isArray(obj.pinnedCharacters) || !obj.pinnedCharacters.every(isCharacter)) {
+      throw new Error("pinnedCharacters が不正です");
+    }
+    pinnedCharacters = obj.pinnedCharacters as Character[];
+  }
+
+  return { version: 1, activeId: obj.activeId, entries, pinnedCharacters };
 };

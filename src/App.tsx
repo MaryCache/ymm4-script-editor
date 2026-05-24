@@ -50,11 +50,15 @@ export default function App() {
     project,
     tabs,
     activeId,
+    characters,
+    pinnedCharacters,
     setProjectName,
     addCharacter,
     deleteCharacter,
     renameCharacter,
     setCharacterColor,
+    pinCharacter,
+    unpinCharacter,
     addLineAtEnd,
     addLineAfter,
     deleteLine,
@@ -175,16 +179,17 @@ export default function App() {
     };
   }, []);
 
-  // copyLine は characters が変わった時のみ再生成。テキスト編集では characters 参照は不変なので、
+  // copyLine は実効キャラ一覧（共通 + ローカル）で名前解決（F-126）。
+  // characters が変わった時のみ再生成。テキスト編集では characters 参照は不変なので、
   // 毎打鍵で LineRow が再描画されることはない（NF-10 維持）。
   const copyLine = useCallback(
     (line: Line) => {
-      navigator.clipboard.writeText(buildLineCSV(line, project.characters)).catch((e) => {
+      navigator.clipboard.writeText(buildLineCSV(line, characters)).catch((e) => {
         console.error("コピーに失敗しました", e);
         pushToast("コピーに失敗しました。", "error");
       });
     },
-    [project.characters, pushToast],
+    [characters, pushToast],
   );
 
   // moveLine のラッパ: moveLine は安定参照だが引数変換が必要なため useCallback で包む
@@ -279,14 +284,17 @@ export default function App() {
           onRename={renameProject}
         />
         <CharacterPanel
+          pinnedCharacters={pinnedCharacters}
           characters={project.characters}
           onAdd={addCharacter}
           onDelete={deleteCharacter}
           onRename={renameCharacter}
           onColorChange={setCharacterColor}
+          onPin={pinCharacter}
+          onUnpin={unpinCharacter}
         />
         <ScriptEditor
-          characters={project.characters}
+          characters={characters}
           lines={project.lines}
           onAddLine={addLineAtEnd}
           onCharacterChange={updateLineCharacter}

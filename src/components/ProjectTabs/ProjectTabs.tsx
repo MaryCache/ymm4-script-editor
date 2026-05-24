@@ -200,9 +200,7 @@ export function ProjectTabs({ tabs, activeId, onSwitch, onNew, onClose, onRename
     const currentIds = new Set(tabs.map((t) => t.id));
 
     if (!reduced) {
-      const removed = prev
-        .map((t, i) => ({ tab: t, index: i }))
-        .filter(({ tab }) => !currentIds.has(tab.id));
+      const removed = prev.map((t, i) => ({ tab: t, index: i })).filter(({ tab }) => !currentIds.has(tab.id));
 
       if (removed.length > 0) {
         setGhosts((g) => {
@@ -344,9 +342,7 @@ export function ProjectTabs({ tabs, activeId, onSwitch, onNew, onClose, onRename
   //      昇順で挿入すると先頭側の挿入が後ろのインデックスをずらすため、
   //      挿入のたびにオフセットを +1 する。
   //   3. ghost の index は prevTabs 内の位置なので、現行 tabs の長さ + 既挿入数でクランプする。
-  type RenderItem =
-    | { kind: "tab"; tab: TabEntry; idx: number }
-    | { kind: "ghost"; ghost: GhostTab };
+  type RenderItem = { kind: "tab"; tab: TabEntry; idx: number } | { kind: "ghost"; ghost: GhostTab };
 
   const mergedList: RenderItem[] = tabs.map((tab, idx) => ({ kind: "tab" as const, tab, idx }));
   const sortedGhosts = [...ghosts].sort((a, b) => a.index - b.index);

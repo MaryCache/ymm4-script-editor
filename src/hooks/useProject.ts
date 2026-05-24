@@ -1,6 +1,6 @@
 // src/hooks/useProject.ts
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Line, Project, TabEntry, Workspace } from "../types";
+import type { Character, Line, Project, TabEntry, Workspace } from "../types";
 import { generateId } from "../utils/id";
 import { colorForIndex } from "../utils/color";
 import { buildCSV, buildCSVText } from "../utils/csv";
@@ -59,10 +59,25 @@ export type UseProjectReturn = {
   tabs: TabEntry[];
   /** 現在アクティブなエントリの id。 */
   activeId: string;
+  /**
+   * 実効キャラ一覧（共通 ∪ アクティブ project のローカル）。
+   *
+   * @remarks
+   * `[...pinnedCharacters, ...activeProject.characters]` の合成（共通が先）。
+   * 行ドロップダウン・LineRow・CSV/Markdown 名前解決はこれを使う（F-126）。
+   */
+  characters: Character[];
+  /**
+   * 全プロジェクト共有の共通キャラ一覧（CharacterPanel の上部グループ・ピン判定用）。
+   */
+  pinnedCharacters: Character[];
   /** プロジェクト名を更新する。 */
   setProjectName: (name: string) => void;
   /**
    * 指定名のキャラクターを末尾に追加する。
+   *
+   * @remarks
+   * 常にアクティブ project のローカルに追加する。色は実効一覧の長さ基準で付与。
    *
    * @param name - 追加するキャラクター名
    */
@@ -71,8 +86,9 @@ export type UseProjectReturn = {
    * 指定 ID のキャラクターを削除する。
    *
    * @remarks
-   * 最後の1キャラクターは削除不可（孤児 Line 防止）。該当行の `characterId` は
-   * 「削除対象でない最初のキャラクター」へ付け替える（要件 F-04）。
+   * ガード: 実効一覧が1キャラ以下なら no-op（最後の1キャラは削除不可）。
+   * - 共通プールの id の場合: 共通プールから除去し、全プロジェクトのラインで参照行を付け替える。
+   * - ローカルの id の場合: アクティブ project のローカルから除去し、参照行を付け替える（既存挙動）。
    *
    * @param id - 削除対象のキャラクター ID
    */
@@ -131,6 +147,7 @@ export type UseProjectReturn = {
    * @remarks
    * `name.trim()` が空文字列の場合は no-op（元の名前を維持）。
    * trim した名前を採用するため、前後の空白は除去される。
+   * id が共通プールにある場合は共通プールを更新（全タブ反映）、なければローカルを更新（F-122）。
    *
    * @param id - 変更対象のキャラクター ID
    * @param name - 新しいキャラクター名
@@ -139,10 +156,31 @@ export type UseProjectReturn = {
   /**
    * 指定 ID のキャラクターの色を変更する。
    *
+   * @remarks
+   * id が共通プールにある場合は共通プールを更新（全タブ反映）、なければローカルを更新（F-122）。
+   *
    * @param id - 変更対象のキャラクター ID
    * @param color - 新しい CSS hex カラー（例: `"#FF6B6B"`）
    */
   setCharacterColor: (id: string, color: string) => void;
+  /**
+   * アクティブ project のローカルキャラを共通プールへ移動する（ピン固定）。
+   *
+   * @remarks
+   * id が既に共通プールにある場合は no-op。移動であってコピーではない（id 一意性）。
+   *
+   * @param id - ピンするキャラクターの ID
+   */
+  pinCharacter: (id: string) => void;
+  /**
+   * 共通プールのキャラをアクティブ project のローカルへ移動する（ピン解除）。
+   *
+   * @remarks
+   * id が共通プールにない場合は no-op。移動であってコピーではない（id 一意性）。
+   *
+   * @param id - ピン解除するキャラクターの ID
+   */
+  unpinCharacter: (id: string) => void;
   /**
    * プレーンテキストを改行で分割して台本末尾に一括追加する。
    *
@@ -250,7 +288,7 @@ const defaultProject = (): Project => ({ version: 1, projectName: "新規プロ�
 
 const defaultWorkspace = (): Workspace => {
   const id = generateId();
-  return { version: 1, activeId: id, entries: [{ id, project: defaultProject() }] };
+  return { version: 1, activeId: id, entries: [{ id, project: defaultProject() }], pinnedCharacters: [] };
 };
 
 /**
@@ -279,7 +317,7 @@ const restoreWorkspaceFromStorage = (): Workspace => {
     if (raw) {
       const project = parseProjectFile(JSON.parse(raw));
       const id = generateId();
-      return { version: 1, activeId: id, entries: [{ id, project }] };
+      return { version: 1, activeId: id, entries: [{ id, project }], pinnedCharacters: [] };
     }
   } catch {
     // 壊れていれば既定へ
@@ -383,9 +421,16 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
   const activeEntry = workspace.entries.find((e) => e.id === workspace.activeId)!;
   const project = activeEntry.project;
 
+  // pinnedCharacters: ワークスペース共通キャラ（v1.4）。
+  const pinnedCharacters = workspace.pinnedCharacters;
+
+  // characters: 実効一覧 = [...pinnedCharacters, ...activeProject.characters]（共通が先）。
+  // 行ドロップダウン・LineRow・CSV/Markdown 名前解決はこれを使う（F-126）。
+  const characters: Character[] = [...pinnedCharacters, ...project.characters];
+
   // tabs: 表示用（TabEntry 型）。
-  // isEmpty = lines が0件かつ characters が空のときのみ真（F-113）。
-  //   行なし・キャラあり → 未保存データとみなして閉じ時に確認を要求する。
+  // isEmpty = そのタブ固有の内容（lines + ローカルキャラ）が両方0のときのみ真（F-113）。
+  // 共通キャラはタブ固有のデータではないため isEmpty 判定から除外する（M-1 修正）。
   // useMemo 不要: レンダー毎の計算コストは配列マップのみで軽量。
   const tabs: TabEntry[] = workspace.entries.map((e) => ({
     id: e.id,
@@ -406,40 +451,74 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
 
   const addCharacter = useCallback(
     (name: string) =>
-      setWorkspace((w) =>
-        updateActiveProject(w, (p) => ({
+      setWorkspace((w) => {
+        // 色は実効一覧の長さ基準で付与（共通 + ローカルの合計で衝突回避）。
+        const effectiveLength =
+          w.pinnedCharacters.length + (w.entries.find((e) => e.id === w.activeId)?.project.characters.length ?? 0);
+        return updateActiveProject(w, (p) => ({
           ...p,
-          characters: [...p.characters, { id: generateId(), name, color: colorForIndex(p.characters.length) }],
-        })),
-      ),
+          characters: [...p.characters, { id: generateId(), name, color: colorForIndex(effectiveLength) }],
+        }));
+      }),
     [],
   );
 
-  // 最後の1キャラを削除しない理由: キャラが0になると全 Line が孤児になり
-  // select が空になって UI が壊れる。ガードで不変を保つ。
-  // fallback は「削除対象でない最初のキャラ」。該当 Line を付け替えることで孤児を作らない（F-04）。
+  // deleteCharacter: 実効一覧（共通 + ローカル）が1以下なら no-op。
+  // 共通プールの id の場合: 共通プールから除去し、全プロジェクトのラインで参照行を付け替える。
+  // ローカルの id の場合: アクティブ project のローカルから除去し、参照行を付け替える（既存挙動）。
+  // fallback は「除去後の実効一覧の先頭」。該当 Line を付け替えることで孤児を作らない（F-04）。
   const deleteCharacter = useCallback(
     (id: string) =>
-      setWorkspace((w) =>
-        updateActiveProject(w, (p) => {
-          if (p.characters.length <= 1) return p; // 最後の1キャラは削除不可
-          const fallbackId = p.characters.find((c) => c.id !== id)?.id ?? "";
+      setWorkspace((w) => {
+        const activeProject = w.entries.find((e) => e.id === w.activeId)?.project;
+        if (!activeProject) return w;
+        // 実効一覧 = [...pinnedCharacters, ...localCharacters]
+        const effectiveTotal = w.pinnedCharacters.length + activeProject.characters.length;
+        if (effectiveTotal <= 1) return w; // 最後の1キャラは削除不可
+
+        const isPinned = w.pinnedCharacters.some((c) => c.id === id);
+
+        if (isPinned) {
+          // 共通プールから除去 → 全プロジェクトのラインで付け替え
+          const newPinned = w.pinnedCharacters.filter((c) => c.id !== id);
           return {
-            ...p,
-            characters: p.characters.filter((c) => c.id !== id),
-            lines: p.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
+            ...w,
+            pinnedCharacters: newPinned,
+            entries: w.entries.map((entry) => {
+              // 除去後の実効一覧: [...newPinned, ...entry.project.characters]
+              const fallbackId = newPinned[0]?.id ?? entry.project.characters[0]?.id ?? "";
+              const updatedLines = entry.project.lines.map((l) =>
+                l.characterId === id ? { ...l, characterId: fallbackId } : l,
+              );
+              return { ...entry, project: { ...entry.project, lines: updatedLines } };
+            }),
           };
-        }),
-      ),
+        } else {
+          // ローカルキャラ削除（アクティブ project のみ）
+          return updateActiveProject(w, (p) => {
+            // 理論上到達しない（effectiveTotal > 1 かつ isPinned=false ならローカルに必ず1件以上）が、
+            // 防御的ガードとして残す。
+            if (p.characters.length <= 0) return p;
+            // fallback: 除去後の実効一覧先頭（共通優先）
+            const fallbackId = w.pinnedCharacters[0]?.id ?? p.characters.find((c) => c.id !== id)?.id ?? "";
+            return {
+              ...p,
+              characters: p.characters.filter((c) => c.id !== id),
+              lines: p.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
+            };
+          });
+        }
+      }),
     [],
   );
 
-  // 文脈がないため先頭キャラを割り当てる。
+  // 文脈がないため先頭キャラ（実効一覧: 共通優先）を割り当てる。
   const addLineAtEnd = useCallback(
     () =>
       setWorkspace((w) =>
         updateActiveProject(w, (p) => {
-          const first = p.characters[0];
+          // 実効一覧: 共通が先
+          const first = w.pinnedCharacters[0] ?? p.characters[0];
           if (!first) return p; // キャラ未登録なら no-op
           return { ...p, lines: [...p.lines, newLine(first.id)] };
         }),
@@ -453,12 +532,14 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
     (afterId: string) =>
       setWorkspace((w) =>
         updateActiveProject(w, (p) => {
-          const first = p.characters[0];
+          // 実効一覧: 共通 + ローカル
+          const effective = [...w.pinnedCharacters, ...p.characters];
+          const first = effective[0];
           if (!first) return p; // キャラ未登録なら no-op
           const idx = p.lines.findIndex((l) => l.id === afterId);
           if (idx === -1) return p;
           const sourceLine = p.lines[idx];
-          const inheritedCharId = p.characters.some((c) => c.id === sourceLine?.characterId)
+          const inheritedCharId = effective.some((c) => c.id === sourceLine?.characterId)
             ? (sourceLine?.characterId ?? first.id)
             : first.id;
           const next = [...p.lines];
@@ -519,30 +600,44 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
 
   // --- v1.2 追加 mutator ---
 
-  // name.trim() が空なら no-op（元の名前を維持）。trim した名前を採用する。
+  // renameCharacter: id が共通プールにあれば共通を更新（全タブ反映）、なければローカル更新（F-122）。
+  // name.trim() が空なら no-op。
   const renameCharacter = useCallback(
     (id: string, name: string) =>
-      setWorkspace((w) =>
-        updateActiveProject(w, (p) => {
-          const trimmed = name.trim();
-          if (!trimmed) return p; // 空文字は no-op
+      setWorkspace((w) => {
+        const trimmed = name.trim();
+        if (!trimmed) return w; // 空文字は no-op
+        if (w.pinnedCharacters.some((c) => c.id === id)) {
+          // 共通プールを更新（全タブ反映）
           return {
-            ...p,
-            characters: p.characters.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
+            ...w,
+            pinnedCharacters: w.pinnedCharacters.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
           };
-        }),
-      ),
+        }
+        // ローカル更新
+        return updateActiveProject(w, (p) => ({
+          ...p,
+          characters: p.characters.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
+        }));
+      }),
     [],
   );
 
+  // setCharacterColor: id が共通プールにあれば共通を更新（全タブ反映）、なければローカル更新（F-122）。
   const setCharacterColor = useCallback(
     (id: string, color: string) =>
-      setWorkspace((w) =>
-        updateActiveProject(w, (p) => ({
+      setWorkspace((w) => {
+        if (w.pinnedCharacters.some((c) => c.id === id)) {
+          return {
+            ...w,
+            pinnedCharacters: w.pinnedCharacters.map((c) => (c.id === id ? { ...c, color } : c)),
+          };
+        }
+        return updateActiveProject(w, (p) => ({
           ...p,
           characters: p.characters.map((c) => (c.id === id ? { ...c, color } : c)),
-        })),
-      ),
+        }));
+      }),
     [],
   );
 
@@ -564,14 +659,16 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
         let characters = p.characters;
         let characterId: string;
 
-        if (characters.length === 0) {
+        // 実効一覧（共通 + ローカル）を使って先頭キャラを決める。
+        const effective = [...w.pinnedCharacters, ...p.characters];
+        if (effective.length === 0) {
           // キャラが0人なら「キャラ1」を自動作成する。
           const newChar = { id: generateId(), name: "キャラ1", color: colorForIndex(0) };
           characters = [newChar];
           characterId = newChar.id;
         } else {
           // noUncheckedIndexedAccess のため非 null アサーション: length > 0 を確認済み。
-          characterId = characters[0]!.id;
+          characterId = effective[0]!.id;
         }
 
         const newLines = parsed.map((lineText) => ({ id: generateId(), characterId, text: lineText }));
@@ -591,10 +688,19 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
   // これらは project の現在値を関数実行時に読むため、updater 形式が使えず [project] 依存。
   // Header など1コンポーネントにのみ渡るため、project 変化ごとの再生成コストは無視可。
 
+  // saveToFile: 書き出す characters を materialize する（F-125）。
+  // materialize = [...参照されている pinnedCharacters, ...localCharacters]（重複なし）。
+  // ファイルがファイル単体で自己完結する（YMM4/再読込で名前が解決できる）。
   const saveToFile = useCallback(() => {
     const base = sanitizeFilename(project.projectName);
-    downloadText(JSON.stringify(project, null, 2), `${base}.ymscript`, "application/json");
-  }, [project]);
+    const referencedPinIds = new Set(project.lines.map((l) => l.characterId));
+    const referencedPinned = pinnedCharacters.filter((c) => referencedPinIds.has(c.id));
+    const materialized: Project = {
+      ...project,
+      characters: [...referencedPinned, ...project.characters],
+    };
+    downloadText(JSON.stringify(materialized, null, 2), `${base}.ymscript`, "application/json");
+  }, [project, pinnedCharacters]);
 
   // --- § 8-2: loadFromFile / importMarkdown は新規タブとして追加してアクティブにする ---
   // setWorkspace の updater 形式で workspace 全体を更新するため [] で安定参照。
@@ -612,13 +718,22 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
 
   const exportCSV = useCallback(() => {
     const base = sanitizeFilename(project.projectName);
-    downloadText(buildCSV(project), `${base}.csv`, "text/csv;charset=utf-8");
-  }, [project]);
+    // 実効一覧（共通 + ローカル）で名前解決（F-126）。
+    // characters は workspace 由来だが、project と同じ workspace レンダー値を参照するため
+    // project 変化タイミングと一致する。[project] 依存のみで十分。
+    const effective = [...pinnedCharacters, ...project.characters];
+    const effectiveProject: Project = { ...project, characters: effective };
+    downloadText(buildCSV(effectiveProject), `${base}.csv`, "text/csv;charset=utf-8");
+  }, [project, pinnedCharacters]);
 
   const exportMarkdown = useCallback(() => {
     const base = sanitizeFilename(project.projectName);
-    downloadText(buildMarkdown(project), `${base}.md`, "text/markdown;charset=utf-8");
-  }, [project]);
+    // materialize: 参照されている共通キャラ + ローカルキャラ（F-125）。
+    const referencedPinIds = new Set(project.lines.map((l) => l.characterId));
+    const referencedPinned = pinnedCharacters.filter((c) => referencedPinIds.has(c.id));
+    const materialized: Project = { ...project, characters: [...referencedPinned, ...project.characters] };
+    downloadText(buildMarkdown(materialized), `${base}.md`, "text/markdown;charset=utf-8");
+  }, [project, pinnedCharacters]);
 
   // § 8-2: importMarkdown も新規タブとして追加してアクティブにする。
   const importMarkdown = useCallback(async (file: File): Promise<number> => {
@@ -634,8 +749,76 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
   }, []);
 
   const exportCSVToClipboard = useCallback(async () => {
-    await navigator.clipboard.writeText(buildCSVText(project));
-  }, [project]);
+    // 実効一覧（共通 + ローカル）で名前解決（F-126）。
+    const effective = [...pinnedCharacters, ...project.characters];
+    const effectiveProject: Project = { ...project, characters: effective };
+    await navigator.clipboard.writeText(buildCSVText(effectiveProject));
+  }, [project, pinnedCharacters]);
+
+  // --- v1.4 共通キャラ操作 ---
+
+  // pinCharacter: アクティブ project のローカル → 共通プール末尾へ移動（F-120）。
+  // 既に共通プールにある id は no-op（移動であってコピーでない）。
+  const pinCharacter = useCallback(
+    (id: string) =>
+      setWorkspace((w) => {
+        if (w.pinnedCharacters.some((c) => c.id === id)) return w; // 既に共通なら no-op
+        const activeProject = w.entries.find((e) => e.id === w.activeId)?.project;
+        if (!activeProject) return w;
+        const target = activeProject.characters.find((c) => c.id === id);
+        if (!target) return w; // ローカルにも存在しない場合は no-op
+        return {
+          ...w,
+          pinnedCharacters: [...w.pinnedCharacters, target],
+          entries: w.entries.map((e) =>
+            e.id === w.activeId
+              ? { ...e, project: { ...e.project, characters: e.project.characters.filter((c) => c.id !== id) } }
+              : e,
+          ),
+        };
+      }),
+    [],
+  );
+
+  // unpinCharacter: 共通プール → アクティブ project のローカル末尾へ移動。
+  // 共通プールにない id は no-op。
+  // 仕様 spec-v1.4 §5: unpin 後、対象 id を参照していた**他プロジェクト**のラインは
+  // 各プロジェクトの実効一覧先頭（[...newPinned, ...entry.project.characters] の先頭）へ
+  // 付け替える（孤児化防止）。アクティブ project のラインは移動先のローカルキャラを
+  // 引き続き参照するため付け替えない（H-1 修正）。
+  const unpinCharacter = useCallback(
+    (id: string) =>
+      setWorkspace((w) => {
+        const target = w.pinnedCharacters.find((c) => c.id === id);
+        if (!target) return w; // 共通にいなければ no-op
+
+        const newPinned = w.pinnedCharacters.filter((c) => c.id !== id);
+
+        return {
+          ...w,
+          pinnedCharacters: newPinned,
+          entries: w.entries.map((e) => {
+            if (e.id === w.activeId) {
+              // アクティブ project: キャラをローカルへ追加。ラインは付け替えない（移動先を参照継続）。
+              return { ...e, project: { ...e.project, characters: [...e.project.characters, target] } };
+            }
+            // 他プロジェクト: unpin 後の実効一覧 = [...newPinned, ...entry.project.characters]。
+            // 対象 id を参照するラインを fallback（実効一覧先頭 or ""）へ付け替える（孤児化防止）。
+            const fallbackId = newPinned[0]?.id ?? e.project.characters[0]?.id ?? "";
+            const linesHaveRef = e.project.lines.some((l) => l.characterId === id);
+            if (!linesHaveRef) return e; // 参照なければそのまま返す（不要な再生成を避ける）
+            return {
+              ...e,
+              project: {
+                ...e.project,
+                lines: e.project.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
+              },
+            };
+          }),
+        };
+      }),
+    [],
+  );
 
   // --- v1.3 ワークスペース操作 ---
 
@@ -687,6 +870,8 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
     project,
     tabs,
     activeId,
+    characters,
+    pinnedCharacters,
     setProjectName,
     addCharacter,
     deleteCharacter,
@@ -698,6 +883,8 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
     moveLine,
     renameCharacter,
     setCharacterColor,
+    pinCharacter,
+    unpinCharacter,
     importPlainText,
     clearAllLines,
     saveToFile,

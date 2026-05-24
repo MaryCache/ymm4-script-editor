@@ -480,6 +480,21 @@ Header は `@media (display-mode: window-controls-overlay)` で `app-region:drag
   type Workspace = { version: 1; activeId: string; entries: WorkspaceEntry[]; };
   ```
 - **useProject のワークスペース化**: 公開 API 名は `useProject` のまま（`useWorkspace` へ改名しない）。内部で `Workspace` を state として保持し、既存 mutator はすべてアクティブ entry の `project` に作用。新規公開: `tabs: {id, name}[]` / `activeId` / `newProject()` / `switchProject(id)` / `closeProject(id)`。
-- **ProjectTabs** コンポーネント（新規）: `role="tablist"` のタブストリップ。編集領域の `role="tabpanel"` コンテナは App 側に配置。アニメ: 追加=appear-slide / 閉じる=フェード / 下線移動=スライド。
+- **ProjectTabs** コンポーネント（新規）: `role="tablist"` のタブストリップ。編集領域の `role="tabpanel"` コンテナは App 側に配置。アニメ: 追加=appear-slide / 閉じる=フェード / 下線移動=スライド。（**→ v1.3 後の UI 改良詳細は §10.14**）
 - **ストレージキー移行**: 主キー `ymm4-script-editor:workspace`（Workspace JSON）。旧キー `ymm4-script-editor:last-project`（単体 Project）は起動時マイグレーション用に参照継続し、workspace キーが正となった後も削除しない。
 - **マイグレーションロジック**: 起動時 ①workspace キーあり→採用、②なし→旧キー確認し1エントリのワークスペースに変換、③どちらもなし→既定の空プロジェクト1件。
+
+### 10.13 React Compiler 有効化（2026-05-25）
+
+- `@vitejs/plugin-react` v6 は Oxc ベースで `babel` オプションが廃止されたため、React Compiler は `@rolldown/plugin-babel` + `reactCompilerPreset()` で組み込む（peer: `@babel/core` / `babel-plugin-react-compiler`）。`vite.config.ts` の `plugins` に追加し、target は React 19。
+- 手動メモ化（`LineRow` の `React.memo()`、`useProject` mutator の `useCallback([])`）は引き続き残す。Compiler が自動メモ化で裏打ちするため、手動 memo とバッティングしない（`eslint-plugin-react-hooks` v7 の `preserve-manual-memoization` ルールで整合）。
+- NF-10（60fps 維持）向けの性能対策が Compiler 採用によってビルド側で担保される。
+
+### 10.14 ProjectTabs UI 改良詳細（2026-05-25）
+
+> spec-v1.3 §7.1 の基本設計に対し、v1.3 実装後の UI 作り込みで以下が発展した。`spec-v1.3-multi-project-tabs.md §7.1` も同内容に更新済み。
+
+- **＋（新規）ボタン**: 配置は「行の右端固定」ではなく**タブリストの末尾（最後のタブの直後）に追従**し、タブと一緒に横スクロールする。hover で装飾の「＋」が **90度回転**（ScriptEditor の行追加ボタン `.plus` と同パターン）。タブ増減時は ＋ の x 位置を **FLIP でグライド**（reduced-motion で即時）。
+- **×（閉じ）ボタン**: **タブの箱（枠線・背景・アクティブ下線を持つ tabItem）の内側**に配置し、**タブ縦幅いっぱい（全高）**。既定は非表示で、タブ hover / `:focus-within` 時に **opacity フェードで出現**（レイアウトは確保しガタつかない）。最後の1タブでは disabled。
+- **タブ退場アニメ**: ×クリックを横取りせず「`tabs` prop から id が消えたこと」を検知し、**消えた元の位置にゴースト要素を差し込んでフェード＋幅コラプス**（全削除経路＝×/Delete キー/ConfirmDialog を一元カバー）。reduced-motion 時はゴーストなし即時。
+- すべて `prefers-reduced-motion: reduce` 尊重。
