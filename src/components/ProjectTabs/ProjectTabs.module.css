@@ -46,13 +46,37 @@
   min-width: max-content;
 }
 
-/* ===== 個別タブ: tabItem ===== */
+/* ===== 個別タブ: tabItem =====
+ * タブの「箱」= 枠線(border-right)・背景・アクティブ下線を tabItem に持たせる。
+ * Why: × 閉じボタンをこの箱の内側に収めるため。枠線を子の .tabBtn に置くと
+ *   × が枠の外側に出てしまう（ユーザー指摘）。箱を tabItem に集約し、
+ *   .tabBtn（ラベル）と .closeBtn（×）の両方を枠内に並べる。
+ */
 .tabItem {
   display: flex;
   align-items: stretch;
   flex-shrink: 0;
   position: relative;
-  /* アクティブ下線の transition はここに置く（子の ::after ではなく tabItem 直接）*/
+  border-right: 1px solid var(--border-1);
+  /* アクティブ下線（cyan）。transparent からの box-shadow transition で滑らかに切替 */
+  box-shadow: inset 0 -2px 0 transparent;
+  transition:
+    background 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+}
+
+.tabItem:hover {
+  background: rgba(255, 255, 255, 0.035);
+}
+
+/* アクティブタブ: 下線 cyan + 背景強調（箱全体に適用＝× の下まで下線が伸びる）*/
+.tabItemActive {
+  background: rgba(16, 125, 200, 0.1);
+  box-shadow: inset 0 -2px 0 var(--accent-2);
+}
+
+.tabItemActive:hover {
+  background: rgba(16, 125, 200, 0.14);
 }
 
 /* 新規追加アニメーション: appear-slide (opacity + translateX) */
@@ -71,51 +95,39 @@
   }
 }
 
-/* ===== タブ本体ボタン ===== */
+/* ===== タブ本体ボタン（ラベル部分）=====
+ * 枠線・背景・下線は親 .tabItem が持つ。tabBtn はラベルのクリック領域に専念する。
+ */
 .tabBtn {
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 0 10px 0 12px;
+  padding: 0 4px 0 12px;
   background: transparent;
   border: none;
-  border-right: 1px solid var(--border-1);
   color: var(--text-2);
   font-size: 12px;
   font-family: var(--font-ui);
   cursor: pointer;
   white-space: nowrap;
   max-width: 180px;
-  /* タブ下線（アクティブ時に cyan）*/
-  box-shadow: inset 0 -2px 0 transparent;
-  /* box-shadow の transition でアクティブ下線を滑らかに切り替える */
-  transition:
-    color 140ms var(--ease-out),
-    background 140ms var(--ease-out),
-    box-shadow 140ms var(--ease-out);
+  transition: color 140ms var(--ease-out);
   outline: none;
 }
 
-.tabBtn:hover {
+/* hover / active の文字色は箱（tabItem）の状態に連動させる */
+.tabItem:hover .tabBtn {
   color: var(--text-1);
-  background: rgba(255, 255, 255, 0.035);
+}
+
+.tabItemActive .tabBtn {
+  color: var(--accent-2);
 }
 
 .tabBtn:focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: -2px;
   border-radius: 2px;
-}
-
-/* アクティブタブ: 下線 cyan + 背景強調 */
-.tabItemActive .tabBtn {
-  color: var(--accent-2);
-  background: rgba(16, 125, 200, 0.10);
-  box-shadow: inset 0 -2px 0 var(--accent-2);
-}
-
-.tabItemActive .tabBtn:hover {
-  background: rgba(16, 125, 200, 0.14);
 }
 
 /* ===== タブ名 span ===== */
@@ -145,22 +157,23 @@
   box-shadow: 0 0 0 2px rgba(16, 125, 200, 0.25);
 }
 
-/* ===== × 閉じボタン ===== */
+/* ===== × 閉じボタン =====
+ * タブの箱（.tabItem）の内側・右寄せに置き、縦はタブ高いっぱい（align-self: stretch）。
+ * width を常に確保してレイアウトを保持する（opacity で隠すだけ）ので hover 時にガタつかない。
+ */
 .closeBtn {
   display: flex;
   align-items: center;
   justify-content: center;
-  /* width/height を常に確保してレイアウトを保持する（opacity で隠すだけ）。
-   * これによりタブ幅が hover 時にガタつかない。
-   */
-  width: 18px;
-  height: 18px;
-  margin: 0 4px 0 -4px;
-  border-radius: 3px;
+  align-self: stretch; /* タブの縦幅いっぱいに */
+  width: 24px;
+  padding: 0;
+  margin: 0;
   background: transparent;
   border: none;
   color: var(--text-3);
-  font-size: 11px;
+  font-size: 13px;
+  line-height: 1;
   cursor: pointer;
   flex-shrink: 0;
   outline: none;
@@ -173,7 +186,7 @@
 
 .closeBtn:hover {
   color: var(--danger);
-  background: rgba(239, 106, 106, 0.12);
+  background: rgba(239, 106, 106, 0.14);
 }
 
 /* ③ × reveal: 最後の1タブ以外のボタン。
@@ -242,16 +255,15 @@
   }
 }
 
-/* ゴーストの × は装飾専用（操作不可） */
+/* ゴーストの × は装飾専用（操作不可）。実タブの .closeBtn と同じ見た目に揃える。 */
 .closeBtnGhost {
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 18px;
-  height: 18px;
-  margin: 0 4px 0 -4px;
+  align-self: stretch;
+  width: 24px;
   flex-shrink: 0;
-  font-size: 11px;
+  font-size: 13px;
   color: var(--text-3);
   pointer-events: none;
 }
