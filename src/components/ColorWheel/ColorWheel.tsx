@@ -24,45 +24,54 @@ export type ColorWheelProps = {
   onClose: () => void;
 };
 
-// 色相環の寸法定数。
-const WHEEL_SIZE = 200; // px — SVG コンテナの一辺
-const OUTER_R = 90; // 外径（px）
-const INNER_R = 64; // 内径（px）— リング幅 = OUTER_R - INNER_R = 26px
-
-// SV スクエアの寸法: 内径の正方形（対角線が内径の円に内接）。
-// 内径円の半径 = INNER_R → 内接正方形の一辺 = INNER_R * √2
-const SV_SIZE = Math.floor(INNER_R * Math.SQRT2) - 4; // 4px のマージン
+// ===== 寸法定数 =====
+// リング全体の外径（px）。ポップオーバー内に収まる想定サイズ。
+const RING_OUTER = 200;
+// リング幅（px）。細めのドーナツにする。
+const RING_WIDTH = 26;
+// 内径（px）。
+const RING_INNER = RING_OUTER - RING_WIDTH * 2;
+// リング中心半径（マーカー配置用）。
+const RING_MID_R = RING_OUTER / 2 - RING_WIDTH / 2;
+// SV スクエアの一辺（px）。内接円（半径 = RING_INNER/2）に内接する正方形。
+// 内接正方形の一辺 = 内半径 × √2 — 余白 2px。
+const SV_SIZE = Math.floor((RING_INNER / 2) * Math.SQRT2) - 2;
 
 /** HSV 型エイリアス（内部状態）。 */
 type Hsv = { h: number; s: number; v: number };
 
+/** 値を [min, max] にクランプするヘルパー。 */
+const clamp = (val: number, min: number, max: number): number => Math.max(min, Math.min(max, val));
+
 /**
- * ポインター座標（コンテナ中心基準）から色相角（0–360）を算出するヘルパー。
+ * ポインター座標（要素中心基準）から色相角（0–360）を算出するヘルパー。
  *
- * @param cx - ポインターの x 座標（コンテナ中心を 0 とした相対値）
- * @param cy - ポインターの y 座標（コンテナ中心を 0 とした相対値、y 軸下向き正）
+ * @remarks
+ * CSS `conic-gradient(from -90deg, ...)` で 0deg=12時方向・時計回りと定義しているため、
+ * atan2 の戻り値（0deg=3時方向・反時計回り）から 90deg を加算して向きを合わせる。
+ *
+ * @param cx - ポインターの x 座標（要素中心を 0 とした相対値）
+ * @param cy - ポインターの y 座標（要素中心を 0 とした相対値、y 軸下向き正）
  * @returns 0–360 の色相角（deg）
  */
 const angleFromCenter = (cx: number, cy: number): number => {
   const rad = Math.atan2(cy, cx);
-  // CSS conic-gradient の 0deg=12時方向・時計回りに合わせるため 90deg オフセット。
+  // atan2 の 0deg=3時 → +90 で 0deg=12時（上）に変換し、時計回り正。
   let deg = (rad * 180) / Math.PI + 90;
   if (deg < 0) deg += 360;
   if (deg >= 360) deg -= 360;
   return deg;
 };
 
-/** 値を [min, max] にクランプするヘルパー。 */
-const clamp = (val: number, min: number, max: number): number => Math.max(min, Math.min(max, val));
-
 /**
  * 依存ゼロの自前カラーピッカーコンポーネント（HSV カラーサークル）。
  *
  * @remarks
- * - **色相リング**: `conic-gradient` の SVG ラップで 360° のリングを描画。クリック / ドラッグ位置の
- *   角度から hue（0–360）を算出し、現在 hue のマーカー（白丸）をリング上に表示する。
- * - **SV スクエア**: リング内側に正方形。横方向に 白→純色、縦方向に 透明→黒 の2レイヤーで
- *   HSV の彩度（s）・明度（v）を操作する。ハンドル（小円）を (s, v) 位置に表示。
+ * - **色相リング（CSS ドーナツ）**: `div` に `conic-gradient` + CSS `mask` で真ん中をくり抜いた
+ *   ドーナツ形のリングを描画。クリック / ドラッグ位置の角度から hue（0–360）を算出し、
+ *   現在 hue のマーカー（白枠の小丸）をリング上に CSS `transform: rotate` で配置する。
+ * - **SV スクエア**: リング内側に正方形。横方向に 白→純色（彩度軸）、縦方向に 透明→黒
+ *   （明度軸）の2レイヤーで HSV の s・v を操作する。ハンドル（小円）を (s, v) 位置に表示。
  * - **hex 入力欄**: 6桁 hex を直接入力可能。妥当な値で `onChange` を呼ぶ。
  *   キーボードのみでも色指定できるためアクセシビリティを確保する。
  * - 内部状態は HSV で保持し、各ハンドラで `hsvToHex` して `onChange` を呼ぶ。
@@ -75,10 +84,11 @@ const clamp = (val: number, min: number, max: number): number => Math.max(min, M
  * @param props - {@link ColorWheelProps}
  */
 export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
-  // useId: 同一ページに複数の ColorWheel が同時に描画されてもクリッパー id が衝突しないよう
+  // useId: 同一ページに複数の ColorWheel が同時に描画されても id が衝突しないよう
   // React が生成するコンポーネント固有の id を使用する。
+  // ピッカーエリアの aria-labelledby 等、将来の a11y 拡張の基点として保持する。
   const uid = useId();
-  const ringClipId = `ring-clip-${uid}`;
+  const pickerId = `color-picker-${uid}`;
 
   // 初期 HSV は props.color から算出する。
   const initial = hexToHsv(color);
@@ -92,6 +102,8 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   const isDraggingRing = useRef(false);
   const isDraggingSv = useRef(false);
 
+  // 色相リングの DOM 参照（ポインター座標を要素ローカル座標に変換するため）。
+  const ringRef = useRef<HTMLDivElement>(null);
   // SV スクエアの DOM 参照（ポインター座標を要素ローカル座標に変換するため）。
   const svRef = useRef<HTMLDivElement>(null);
 
@@ -133,31 +145,28 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   // ===== 色相リングインタラクション =====
 
   /**
-   * SVG コンテナ上のポインター座標から色相を算出して applyHsv を呼ぶ共通ヘルパー。
+   * リング div 上のポインター座標から色相を算出して applyHsv を呼ぶ共通ヘルパー。
    *
    * @param clientX - ポインターのビューポート X 座標
    * @param clientY - ポインターのビューポート Y 座標
    */
   const applyHueFromPointer = (clientX: number, clientY: number) => {
-    if (!containerRef.current) return;
-    const rect = containerRef.current.getBoundingClientRect();
-    // wheelWrapper の padding (4px) を考慮した SVG 内の中心座標を計算。
-    const svgLeft = rect.left + 4; // .wheelWrapper の padding-left
-    const svgTop = rect.top + 4; // .wheelWrapper の padding-top
-    const cx = clientX - svgLeft - WHEEL_SIZE / 2;
-    const cy = clientY - svgTop - WHEEL_SIZE / 2;
+    if (!ringRef.current) return;
+    const rect = ringRef.current.getBoundingClientRect();
+    const cx = clientX - rect.left - rect.width / 2;
+    const cy = clientY - rect.top - rect.height / 2;
     const newHue = Math.round(angleFromCenter(cx, cy));
     applyHsv({ ...hsv, h: newHue });
   };
 
-  const handleRingPointerDown = (e: ReactPointerEvent<SVGSVGElement>) => {
+  const handleRingPointerDown = (e: ReactPointerEvent<HTMLDivElement>) => {
     isDraggingRing.current = true;
     // setPointerCapture: jsdom 未実装のため optional chaining でガード。
-    (e.currentTarget as SVGSVGElement).setPointerCapture?.(e.pointerId);
+    (e.currentTarget as HTMLDivElement).setPointerCapture?.(e.pointerId);
     applyHueFromPointer(e.clientX, e.clientY);
   };
 
-  const handleRingPointerMove = (e: ReactPointerEvent<SVGSVGElement>) => {
+  const handleRingPointerMove = (e: ReactPointerEvent<HTMLDivElement>) => {
     if (!isDraggingRing.current) return;
     applyHueFromPointer(e.clientX, e.clientY);
   };
@@ -216,19 +225,9 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
     }
   };
 
-  // ===== マーカー位置の計算（色相リング）=====
-  // 現在 hue のリング中央（半径 = (OUTER_R + INNER_R) / 2）上の座標を算出する。
-  const markerR = (OUTER_R + INNER_R) / 2;
-  // CSS conic-gradient の 0deg=12時方向・時計回り → atan2 座標系（0=3時, 反時計）への変換。
-  const markerAngleDeg = 90 - hsv.h;
-  const markerAngleRad = (markerAngleDeg * Math.PI) / 180;
-  const markerX = WHEEL_SIZE / 2 + markerR * Math.cos(markerAngleRad);
-  const markerY = WHEEL_SIZE / 2 - markerR * Math.sin(markerAngleRad);
-
   // ===== SV スクエアの背景 =====
-  // 上レイヤー: 横方向に 白→現在 hue の純色
-  // 下レイヤー: 縦方向に 透明→黒
-  // 「白→純色」の純色は HSL(h, 100%, 50%) で近似（HSV の s=100, v=100 に相当する表示色）。
+  // 上レイヤー: 横方向に 白→現在 hue の純色（彩度軸）
+  // 下レイヤー: 縦方向に 透明→黒（明度軸）
   const pureColor = `hsl(${hsv.h} 100% 50%)`;
   const svBgSaturation = `linear-gradient(to right, #fff, ${pureColor})`;
   const svBgValue = "linear-gradient(to top, #000, transparent)";
@@ -240,78 +239,53 @@ export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   // ハンドル枠色: 明度（v）が低い場合は白、高い場合は黒で視認性を確保する。
   const handleBorderColor = hsv.v < 50 ? "rgba(255,255,255,0.8)" : "rgba(0,0,0,0.5)";
 
-  // 現在の hex（swatch と aria ラベルに使用）。
+  // 現在の hex（swatch に使用）。
   const currentHex = hsvToHex(hsv.h, hsv.s, hsv.v);
 
+  // ===== 色相マーカーの角度（CSS rotate に使用）=====
+  // conic-gradient は from -90deg（12時=赤）で開始、時計回り正。
+  // hsv.h=0 → マーカーは 12時位置（-90deg）、hsv.h=90 → 3時位置（0deg）…
+  // rotate(deg) で div の 12時方向を基点に hue 分回す。
+  // marker div は translateY(-RING_MID_R) で上端（12時）に突き出す形にするため:
+  //   transform: rotate(hue deg) → hue=0 は 12時 → 正しい
+  const markerRotate = hsv.h;
+
   return (
-    <div ref={containerRef} className={styles.container} role="group" aria-label="カラーピッカー">
-      {/* ===== 色相リング（SVG ラップ conic-gradient）+ SV スクエア ===== */}
+    <div ref={containerRef} id={pickerId} className={styles.container} role="group" aria-label="カラーピッカー">
+      {/* ===== 色相リング + SV スクエア ===== */}
       {/* aria-hidden: 装飾的要素。キーボード操作は hex 入力欄で担保する。 */}
-      <div className={styles.wheelWrapper} aria-hidden="true">
-        {/* 色相リング SVG */}
-        <svg
-          width={WHEEL_SIZE}
-          height={WHEEL_SIZE}
-          className={styles.wheelSvg}
+      <div className={styles.pickerArea} aria-hidden="true">
+        {/* ===== 色相リング（CSS conic-gradient + mask でドーナツ型）===== */}
+        {/* ポインターイベントは SV スクエアより背面（z-index 低）で受け取る。 */}
+        <div
+          ref={ringRef}
+          className={styles.ring}
+          style={{ width: RING_OUTER, height: RING_OUTER }}
           onPointerDown={handleRingPointerDown}
           onPointerMove={handleRingPointerMove}
           onPointerUp={handleRingPointerUp}
           onPointerCancel={handleRingPointerUp}
-          style={{ cursor: "crosshair" }}
         >
-          <defs>
-            {/* リング形状のクリッパー: 外円 - 内円（evenodd で穴を作る）*/}
-            <clipPath id={ringClipId}>
-              <path
-                d={`
-                  M ${WHEEL_SIZE / 2} ${WHEEL_SIZE / 2 - OUTER_R}
-                  A ${OUTER_R} ${OUTER_R} 0 1 1 ${WHEEL_SIZE / 2 - 0.001} ${WHEEL_SIZE / 2 - OUTER_R}
-                  Z
-                  M ${WHEEL_SIZE / 2} ${WHEEL_SIZE / 2 - INNER_R}
-                  A ${INNER_R} ${INNER_R} 0 1 0 ${WHEEL_SIZE / 2 - 0.001} ${WHEEL_SIZE / 2 - INNER_R}
-                  Z
-                `}
-                fillRule="evenodd"
-              />
-            </clipPath>
-          </defs>
-
-          {/* conic-gradient を foreignObject 経由で描画（SVG 内 CSS gradient の代替手法）*/}
-          <foreignObject x="0" y="0" width={WHEEL_SIZE} height={WHEEL_SIZE} clipPath={`url(#${ringClipId})`}>
-            <div
-              style={{
-                width: `${WHEEL_SIZE}px`,
-                height: `${WHEEL_SIZE}px`,
-                borderRadius: "50%",
-                background:
-                  "conic-gradient(from 0deg, hsl(0,100%,50%), hsl(30,100%,50%), hsl(60,100%,50%), hsl(90,100%,50%), hsl(120,100%,50%), hsl(150,100%,50%), hsl(180,100%,50%), hsl(210,100%,50%), hsl(240,100%,50%), hsl(270,100%,50%), hsl(300,100%,50%), hsl(330,100%,50%), hsl(360,100%,50%))",
-              }}
-            />
-          </foreignObject>
-
-          {/* 現在 hue マーカー（白丸、現在色で塗りつぶし）*/}
-          <circle
-            cx={markerX}
-            cy={markerY}
-            r={8}
-            fill={currentHex}
-            stroke="white"
-            strokeWidth={2}
-            style={{ filter: "drop-shadow(0 1px 3px rgba(0,0,0,0.5))", pointerEvents: "none" }}
+          {/* 色相マーカー: 現在 hue 位置を示す白枠の小丸。
+              リング中心を軸に markerRotate deg 回転させ、上端（12時方向）に突き出す。 */}
+          <div
+            className={styles.hueMarker}
+            style={{
+              transform: `rotate(${markerRotate}deg) translateY(-${RING_MID_R}px)`,
+            }}
           />
-        </svg>
+        </div>
 
-        {/* SV スクエア: 色相リングの内側に絶対配置 */}
-        {/* pointer イベントは SVG と重なると SVG が取るため、SV 専用の div で独立して捕捉する。 */}
+        {/* ===== SV スクエア: リング内側に絶対配置（z-index でリングより前面）===== */}
         <div
           ref={svRef}
           className={styles.svSquare}
           style={{
             width: SV_SIZE,
             height: SV_SIZE,
-            // リング中心に配置: top/left = (WHEEL_SIZE - SV_SIZE) / 2 + padding(4px)
-            top: (WHEEL_SIZE - SV_SIZE) / 2 + 4,
-            left: (WHEEL_SIZE - SV_SIZE) / 2 + 4,
+            // リング中心に配置: top/left = (RING_OUTER - SV_SIZE) / 2
+            top: (RING_OUTER - SV_SIZE) / 2,
+            left: (RING_OUTER - SV_SIZE) / 2,
           }}
           onPointerDown={handleSvPointerDown}
           onPointerMove={handleSvPointerMove}

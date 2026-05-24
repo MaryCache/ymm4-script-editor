@@ -46,7 +46,7 @@ test("SV スクエアへの pointerdown で onChange が呼ばれる", () => {
   // aria-hidden 内にある .svSquare を直接 querySelector で取得する。
   // SV スクエアは aria-hidden コンテナ内のため getByRole では取得できない。
   const container = document.querySelector('[role="group"]') as HTMLElement;
-  // svSquare は wheelWrapper > div.svSquare（aria-hidden="true" の子）
+  // svSquare は pickerArea > div.svSquare（aria-hidden="true" の子）
   const svSquare = container.querySelector("[class*='svSquare']") as HTMLElement;
   expect(svSquare).not.toBeNull();
   // getBoundingClientRect() は jsdom では 0 を返すが、pointerdown イベント自体は発火する。
@@ -62,11 +62,13 @@ test("SV スクエアへの pointerdown で onChange が呼ばれる", () => {
 test("色相リングへの pointerdown で onChange が呼ばれる", () => {
   const onChange = vi.fn();
   render(<ColorWheel color="#ff0000" onChange={onChange} onClose={() => {}} />);
-  const svg = document.querySelector("svg") as SVGSVGElement;
-  expect(svg).not.toBeNull();
+  // リングは CSS ドーナツ div（class*='ring'）で描画される（SVG ではない）。
+  const container = document.querySelector('[role="group"]') as HTMLElement;
+  const ring = container.querySelector("[class*='ring']") as HTMLElement;
+  expect(ring).not.toBeNull();
   // jsdom では getBoundingClientRect が 0 を返すため hue 計算は 0 になるが、
   // onChange 呼び出し自体は保証される。
-  fireEvent.pointerDown(svg, { clientX: 0, clientY: 0, pointerId: 1 });
+  fireEvent.pointerDown(ring, { clientX: 0, clientY: 0, pointerId: 1 });
   expect(onChange).toHaveBeenCalled();
   const anyHex = onChange.mock.calls[0]?.[0] as string | undefined;
   expect(anyHex ?? "#000000").toMatch(/^#[0-9a-f]{6}$/);

@@ -45,31 +45,88 @@
   }
 }
 
-/* ===== 色相環ラッパー ===== */
-.wheelWrapper {
-  /* SVG の周囲に少し余白を確保してマーカーが欠けないようにする */
-  padding: 4px;
-  border-radius: 50%;
+/* ===== ピッカーエリア（リング + SV スクエアを収めるコンテナ）===== */
+.pickerArea {
+  /* リングと SV スクエアを重ねる基点。width/height は JS から注入されるリングサイズと同じにする。 */
+  position: relative;
   /* ドラッグ中の選択を防ぐ */
   user-select: none;
   -webkit-user-select: none;
-  /* SV スクエアを内側に絶対配置するための基点 */
+}
+
+/* ===== 色相リング（CSS conic-gradient + mask でドーナツ型）===== */
+.ring {
+  /* width / height は JS から注入（RING_OUTER px）。 */
+  border-radius: 50%;
+  /* 色相グラデーション: conic-gradient の from -90deg で 12時=赤（hue 0）、時計回り。 */
+  background: conic-gradient(
+    from -90deg,
+    hsl(0, 100%, 50%),
+    hsl(30, 100%, 50%),
+    hsl(60, 100%, 50%),
+    hsl(90, 100%, 50%),
+    hsl(120, 100%, 50%),
+    hsl(150, 100%, 50%),
+    hsl(180, 100%, 50%),
+    hsl(210, 100%, 50%),
+    hsl(240, 100%, 50%),
+    hsl(270, 100%, 50%),
+    hsl(300, 100%, 50%),
+    hsl(330, 100%, 50%),
+    hsl(360, 100%, 50%)
+  );
+  /* CSS mask でドーナツ型にくり抜く。
+     外径 = RING_OUTER / 2 = 100%、リング幅 = RING_WIDTH = 26px。
+     内径 = RING_OUTER/2 - RING_WIDTH = 74px → calc(50% - 26px)。
+     farthest-side: mask の最大半径をコンテナ端に合わせる。 */
+  --ring-width: 26px;
+  -webkit-mask: radial-gradient(
+    farthest-side,
+    transparent calc(50% - var(--ring-width)),
+    #000 calc(50% - var(--ring-width) + 1px)
+  );
+  mask: radial-gradient(
+    farthest-side,
+    transparent calc(50% - var(--ring-width)),
+    #000 calc(50% - var(--ring-width) + 1px)
+  );
+  cursor: crosshair;
+  touch-action: none;
+  /* マーカーを絶対配置するための基点 */
   position: relative;
 }
 
-.wheelSvg {
-  display: block;
-  touch-action: none; /* タッチデバイスのスクロールキャンセル */
+/* ===== 色相マーカー（リング上の現在 hue を示す小丸）===== */
+.hueMarker {
+  /* リング中心（50%,50%）を起点に絶対配置し、margin で自身の半分を引いて正確に中心へ。
+     JS から rotate(hdeg) translateY(-RING_MID_R px) を注入すると、
+     回転軸がリング中心になり hue に対応したリング上の位置にマーカーが乗る。 */
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  /* 中心から自身の半分を引いてリング中心に配置 */
+  top: calc(50% - 7px);
+  left: calc(50% - 7px);
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid rgba(0, 0, 0, 0.35);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  /* transform: rotate(hdeg) translateY(-RING_MID_R px) は JS から注入。
+     transform-origin はデフォルト center = マーカー自身の中心。
+     しかしここで必要な回転軸は「リング中心」なので、
+     top/left で正確にリング中心に揃えた状態で rotate すると transform-origin が
+     リング中心と一致し、正しく動作する。 */
+  pointer-events: none;
 }
 
-/* ===== SV スクエア ===== */
+/* ===== SV スクエア: リング内側に絶対配置 ===== */
 .svSquare {
   position: absolute;
   border-radius: 3px;
   overflow: hidden;
   cursor: crosshair;
   touch-action: none;
-  /* SVG の pointer-events を貫いてこちらが受け取れるよう z-index を設定 */
+  /* リングより前面に出す */
   z-index: 1;
 }
 
@@ -88,8 +145,8 @@
 /* SV ハンドル（小円）: (s, v) 位置に表示 */
 .svHandle {
   position: absolute;
-  width: 12px;
-  height: 12px;
+  width: 13px;
+  height: 13px;
   border-radius: 50%;
   border: 2px solid; /* borderColor は JS から注入（明度に応じて黒/白）*/
   /* translate(-50%, -50%) で中心をポインター位置に合わせる */
@@ -130,7 +187,9 @@
   font-family: var(--font-mono);
   letter-spacing: 0.05em;
   outline: none;
-  transition: border-color 140ms var(--ease-out), background 140ms;
+  transition:
+    border-color 140ms var(--ease-out),
+    background 140ms;
 }
 
 .hexInput:focus {
