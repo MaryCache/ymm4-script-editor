@@ -103,8 +103,10 @@ characters:
 - [**LLM 向け 台本Markdownフォーマット仕様**](docs/llm-script-format.md) — ChatGPT 等に台本を書かせて、そのまま `.md` で取り込むための指示書（貼り付けテンプレ付き）
 - [要件定義書](docs/spec/requirements.md)
 - [設計書](docs/spec/design.md)
-- [Markdown対応 追加仕様](docs/spec/spec-v1.1-markdown.md)
 - [ADR-001: 技術スタック選定](docs/spec/ADR-001-tech-stack.md)
+- [追加仕様 v1.1: Markdown 対応](docs/spec/spec-v1.1-markdown.md)
+- [追加仕様 v1.2: コピペインポート / キャラ編集 / 全行リセット](docs/spec/spec-v1.2-paste-and-character-edit.md)
+- [追加仕様 v1.3: プロジェクトタブ（複数台本管理）](docs/spec/spec-v1.3-multi-project-tabs.md)
 
 ---
 
