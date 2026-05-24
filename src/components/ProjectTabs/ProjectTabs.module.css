@@ -1,0 +1,211 @@
+/* ProjectTabs.module.css
+ *
+ * ヘッダー直下のプロジェクトタブ行。
+ * cold-blue-black カラーシステム / cyan アクセント。
+ * アクティブタブを下線＋背景で強調。
+ * タブが多い場合は横スクロール可能（overflow-x: auto）。
+ * アニメ: appear-slide（新規追加）/ フェード（閉じ）/ アクティブ下線の CSS transition。
+ */
+
+/* ===== タブ行ラッパ: tabsTrack + 新規ボタン を横並び ===== */
+.tabsRow {
+  grid-area: tabs;
+  display: flex;
+  align-items: stretch;
+  background: rgba(4, 24, 42, 0.75);
+  border-bottom: 1px solid var(--border-1);
+  height: 34px;
+  overflow: hidden;
+  position: relative;
+  z-index: 2; /* bgAmbient(z:0) / app(z:1) より前 */
+}
+
+/* スクロールコンテナ: タブが多い時に横スクロール */
+.tabsTrack {
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: hidden;
+  /* スクロールバーを薄く: 標準スクロールバーは太いので抑える */
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-2) transparent;
+}
+
+/* tablist ラッパ: インライン配置でタブを横並びにする */
+.tabList {
+  display: inline-flex;
+  align-items: stretch;
+  height: 100%;
+  min-width: 100%;
+}
+
+/* ===== 個別タブ: tabItem ===== */
+.tabItem {
+  display: flex;
+  align-items: stretch;
+  flex-shrink: 0;
+  position: relative;
+  /* アクティブ下線の transition はここに置く（子の ::after ではなく tabItem 直接）*/
+}
+
+/* 新規追加アニメーション: appear-slide (opacity + translateX) */
+.tabItemEnter {
+  animation: tabAppear 180ms var(--ease-out) both;
+}
+
+@keyframes tabAppear {
+  from {
+    opacity: 0;
+    transform: translateX(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* ===== タブ本体ボタン ===== */
+.tabBtn {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0 10px 0 12px;
+  background: transparent;
+  border: none;
+  border-right: 1px solid var(--border-1);
+  color: var(--text-2);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  cursor: pointer;
+  white-space: nowrap;
+  max-width: 180px;
+  transition: color 140ms var(--ease-out), background 140ms var(--ease-out);
+  /* タブ下線（アクティブ時に cyan）*/
+  box-shadow: inset 0 -2px 0 transparent;
+  /* box-shadow の transition でアクティブ下線を滑らかに切り替える */
+  transition:
+    color 140ms var(--ease-out),
+    background 140ms var(--ease-out),
+    box-shadow 140ms var(--ease-out);
+  outline: none;
+}
+
+.tabBtn:hover {
+  color: var(--text-1);
+  background: rgba(255, 255, 255, 0.035);
+}
+
+.tabBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
+/* アクティブタブ: 下線 cyan + 背景強調 */
+.tabItemActive .tabBtn {
+  color: var(--accent-2);
+  background: rgba(16, 125, 200, 0.10);
+  box-shadow: inset 0 -2px 0 var(--accent-2);
+}
+
+.tabItemActive .tabBtn:hover {
+  background: rgba(16, 125, 200, 0.14);
+}
+
+/* ===== タブ名 span ===== */
+.tabName {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 140px;
+  line-height: 1;
+  cursor: default;
+  user-select: none;
+}
+
+/* ===== タブ名インライン編集 input ===== */
+.tabNameInput {
+  width: 120px;
+  max-width: 140px;
+  background: var(--bg-2);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  font-size: 12px;
+  font-family: var(--font-ui);
+  padding: 1px 6px;
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(16, 125, 200, 0.25);
+}
+
+/* ===== × 閉じボタン ===== */
+.closeBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  margin: 0 4px 0 -4px;
+  border-radius: 3px;
+  background: transparent;
+  border: none;
+  color: var(--text-3);
+  font-size: 11px;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: color 120ms var(--ease-out), background 120ms var(--ease-out);
+  /* tabIndex=-1 なので Tab フォーカスは当たらないが、クリック時に focus-visible が出ないよう */
+  outline: none;
+}
+
+.closeBtn:hover {
+  color: var(--danger);
+  background: rgba(239, 106, 106, 0.12);
+}
+
+/* 最後の1タブでは × を非表示（disabled + hidden）*/
+.closeBtnHidden {
+  opacity: 0;
+  pointer-events: none;
+  visibility: hidden;
+}
+
+/* ===== 「＋」新規ボタン ===== */
+.newBtn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 100%;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border-1);
+  color: var(--text-3);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 140ms var(--ease-out), background 140ms var(--ease-out);
+}
+
+.newBtn:hover {
+  color: var(--accent-2);
+  background: rgba(16, 125, 200, 0.10);
+}
+
+.newBtn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: -2px;
+  border-radius: 2px;
+}
+
+/* ===== prefers-reduced-motion: アニメーションを無効化 ===== */
+@media (prefers-reduced-motion: reduce) {
+  .tabItemEnter {
+    animation: none;
+  }
+
+  .tabBtn {
+    transition: none;
+  }
+}

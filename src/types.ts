@@ -59,3 +59,41 @@ export type Project = {
   /** 台本の行（セリフ）一覧（上から順）。 */
   lines: Line[];
 };
+
+/**
+ * ワークスペース内の1タブに対応するエントリ。
+ *
+ * @remarks
+ * `id` はワークスペース内でタブを一意に識別するための識別子（`crypto.randomUUID()`）。
+ * `.ymscript` 互換を維持するため、`id` は `Project` には持たせず、ラッパ側にのみ保持する。
+ *
+ * @see {@link Workspace}
+ * @see {@link Project}
+ */
+export type WorkspaceEntry = {
+  /** ワークスペース内でタブを一意に識別する ID（`crypto.randomUUID()`）。 */
+  id: string;
+  /** このエントリが保持するプロジェクト（台本データ）。 */
+  project: Project;
+};
+
+/**
+ * 複数プロジェクトを束ねるワークスペース。localStorage 永続化の単位。
+ *
+ * @remarks
+ * 不変条件:
+ * - `entries.length >= 1`（常に最低1エントリ）
+ * - `activeId` は必ず `entries` のいずれかの `id` を指す
+ *
+ * `version: 1` はスキーマバージョン識別子。将来の破壊的変更に備えたリテラル型。
+ *
+ * @see {@link WorkspaceEntry}
+ */
+export type Workspace = {
+  /** スキーマバージョン。現在は常に `1`。 */
+  version: 1;
+  /** 現在アクティブなエントリの `id`。必ず `entries` のいずれかを指す。 */
+  activeId: string;
+  /** タブとして保持するプロジェクトエントリ一覧。1つ以上。 */
+  entries: WorkspaceEntry[];
+};

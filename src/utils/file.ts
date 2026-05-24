@@ -1,5 +1,5 @@
 // src/utils/file.ts
-import type { Character, Line, Project } from "../types";
+import type { Character, Line, Project, Workspace, WorkspaceEntry } from "../types";
 
 /**
  * 文字列からファイル名として不正な文字を除去し、安全なファイル名を返す。
@@ -139,4 +139,46 @@ export const parseProjectFile = (raw: unknown): Project => {
   if (!Array.isArray(obj.characters) || !obj.characters.every(isCharacter)) throw new Error("characters が不正です");
   if (!Array.isArray(obj.lines) || !obj.lines.every(isLine)) throw new Error("lines が不正です");
   return { version: 1, projectName: obj.projectName, characters: obj.characters, lines: obj.lines };
+};
+
+const isWorkspaceEntry = (v: unknown): v is WorkspaceEntry => {
+  if (typeof v !== "object" || v === null) return false;
+  const obj = v as Record<string, unknown>;
+  if (!isString(obj.id)) return false;
+  try {
+    parseProjectFile(obj.project);
+    return true;
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * 未知の JSON 値をワークスペースデータとして検証し、型安全な `Workspace` を返す。
+ *
+ * @remarks
+ * `localStorage` から読み出した JSON を `JSON.parse` した結果を渡す想定。
+ * 以下をすべて検証する:
+ * - `version === 1`
+ * - `activeId` が string
+ * - `entries` が 1 つ以上の `WorkspaceEntry` 配列（各 entry は `parseProjectFile` を通過）
+ * - `activeId` が `entries` のいずれかの `id` と一致する
+ *
+ * @param raw - `JSON.parse` で得た未知の値
+ * @returns 検証済みの `Workspace` オブジェクト
+ * @throws `Error` スキーマ違反・不整合の場合
+ *
+ * @see {@link Workspace}
+ * @see {@link parseProjectFile}
+ */
+export const parseWorkspaceFile = (raw: unknown): Workspace => {
+  if (typeof raw !== "object" || raw === null) throw new Error("ワークスペースの形式が不正です");
+  const obj = raw as Record<string, unknown>;
+  if (obj.version !== 1) throw new Error("非対応のワークスペースバージョンです");
+  if (!isString(obj.activeId)) throw new Error("activeId が不正です");
+  if (!Array.isArray(obj.entries) || obj.entries.length === 0 || !obj.entries.every(isWorkspaceEntry))
+    throw new Error("entries が不正です");
+  const entries = obj.entries as WorkspaceEntry[];
+  if (!entries.some((e) => e.id === obj.activeId)) throw new Error("activeId が entries に存在しません");
+  return { version: 1, activeId: obj.activeId, entries };
 };

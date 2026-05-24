@@ -44,6 +44,63 @@ test("全行リセット確認で行が消える（reduce=true 環境で即時�
   expect(screen.getByText(/行数:\s*0/)).toBeInTheDocument();
 });
 
+// ===== プロジェクトタブ結合テスト（v1.3）=====
+
+// 「＋」新規ボタンで2タブになる
+test("「＋」ボタンで新規タブが追加され2タブになる", async () => {
+  render(<App />);
+  // 初期は1タブ
+  expect(screen.getAllByRole("tab")).toHaveLength(1);
+  // 「新しいプロジェクト」ボタンをクリック
+  await userEvent.click(screen.getByRole("button", { name: "新しいプロジェクト" }));
+  expect(screen.getAllByRole("tab")).toHaveLength(2);
+});
+
+// 空タブの × は即閉じ（ConfirmDialog が出ない）
+test("空タブの × をクリックすると確認なしで閉じる", async () => {
+  render(<App />);
+  // 新規タブを追加して2タブにする
+  await userEvent.click(screen.getByRole("button", { name: "新しいプロジェクト" }));
+  expect(screen.getAllByRole("tab")).toHaveLength(2);
+
+  // 2枚目（アクティブ）は空なので × クリックで即閉じ
+  const closeBtns = screen.getAllByRole("button", { name: /を閉じる/ });
+  await userEvent.click(closeBtns[1]!);
+
+  // ダイアログは出ずに1タブに戻る
+  expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("tab")).toHaveLength(1);
+});
+
+// 中身ありタブの × は ConfirmDialog が出て、確定で閉じる
+test("中身ありタブの × クリックで ConfirmDialog が出て確定で閉じる", async () => {
+  render(<App />);
+  // 初期タブにキャラ追加 → 行追加（中身あり状態にする）
+  await userEvent.type(screen.getByPlaceholderText("キャラクター名"), "霊夢");
+  await userEvent.click(screen.getByRole("button", { name: "追加" }));
+  await userEvent.click(screen.getByRole("button", { name: "+ 行を追加" }));
+  // 行が入ったことを確認
+  expect(screen.getByText(/行数:\s*1/)).toBeInTheDocument();
+
+  // 2枚目タブを追加して切り替えてから1枚目に戻る
+  await userEvent.click(screen.getByRole("button", { name: "新しいプロジェクト" }));
+  // 中身あり（1枚目）の × をクリック
+  const closeBtns = screen.getAllByRole("button", { name: /を閉じる/ });
+  await userEvent.click(closeBtns[0]!);
+
+  // ConfirmDialog が表示される
+  expect(screen.getByRole("alertdialog")).toBeInTheDocument();
+
+  // 「閉じる」ボタンで確定
+  await userEvent.click(screen.getByRole("button", { name: "閉じる" }));
+
+  // ダイアログが閉じてタブが1つになる
+  await waitFor(() => {
+    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
+  });
+  expect(screen.getAllByRole("tab")).toHaveLength(1);
+});
+
 // コピペ取込 → トースト文言が表示される結合テスト
 test("コピペ取込でトースト『N 行を取り込みました。』が表示される", async () => {
   const { baseElement } = render(<App />);

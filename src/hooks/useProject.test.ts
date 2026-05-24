@@ -1,8 +1,11 @@
 // src/hooks/useProject.test.ts
 import { renderHook, act } from "@testing-library/react";
-import { useProject, STORAGE_KEY } from "./useProject";
+import { useProject, STORAGE_KEY, STORAGE_KEY_WORKSPACE } from "./useProject";
+import type { Workspace } from "../types";
 
 beforeEach(() => localStorage.clear());
+
+// ===== 基本動作（既存）=====
 
 test("初期状態はデフォルトプロジェクト（キャラ0・ライン0）", () => {
   const { result } = renderHook(() => useProject());
@@ -67,21 +70,238 @@ test("addLineAfter は指定行の直後に挿入", () => {
   expect(result.current.project.lines).toHaveLength(2);
 });
 
-test("変更が localStorage に自動保存される", () => {
+// ===== 永続化（ワークスペース化後の挙動）=====
+
+test("変更が localStorage（workspaceキー）に自動保存される", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.setProjectName("わたしの台本"));
-  expect(JSON.parse(localStorage.getItem(STORAGE_KEY)!).projectName).toBe("わたしの台本");
+  const raw = localStorage.getItem(STORAGE_KEY_WORKSPACE);
+  expect(raw).not.toBeNull();
+  const ws: Workspace = JSON.parse(raw!);
+  const active = ws.entries.find((e) => e.id === ws.activeId)!;
+  expect(active.project.projectName).toBe("わたしの台本");
 });
 
-test("localStorage に既存があれば復元する", () => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, projectName: "復元", characters: [], lines: [] }));
+test("workspaceキーに有効なワークスペースがあれば復元する", () => {
+  const id = "test-id-1";
+  const ws: Workspace = {
+    version: 1,
+    activeId: id,
+    entries: [{ id, project: { version: 1, projectName: "復元テスト", characters: [], lines: [] } }],
+  };
+  localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(ws));
   const { result } = renderHook(() => useProject());
-  expect(result.current.project.projectName).toBe("復元");
+  expect(result.current.project.projectName).toBe("復元テスト");
+  expect(result.current.activeId).toBe(id);
+});
+
+// ===== マイグレーション =====
+
+test("旧キーのみ存在 → 1エントリのワークスペースに移行してアクティブ", () => {
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ version: 1, projectName: "旧プロジェクト", characters: [], lines: [] }),
+  );
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("旧プロジェクト");
+  expect(result.current.tabs).toHaveLength(1);
+  expect(result.current.activeId).toBe(result.current.tabs[0]!.id);
+});
+
+test("workspaceキー優先（旧キーも存在する場合はworkspaceキーを使う）", () => {
+  const id = "ws-id";
+  const ws: Workspace = {
+    version: 1,
+    activeId: id,
+    entries: [{ id, project: { version: 1, projectName: "ワークスペース側", characters: [], lines: [] } }],
+  };
+  localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(ws));
+  localStorage.setItem(STORAGE_KEY, JSON.stringify({ version: 1, projectName: "旧キー側", characters: [], lines: [] }));
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("ワークスペース側");
+});
+
+test("両方なければ既定ワークスペース（空プロジェクト1つ）", () => {
+  const { result } = renderHook(() => useProject());
+  expect(result.current.tabs).toHaveLength(1);
+  expect(result.current.project.projectName).toBe("新規プロジェクト");
+  expect(result.current.project.characters).toHaveLength(0);
+});
+
+test("workspaceキーが壊れていれば旧キーにフォールバックする", () => {
+  localStorage.setItem(STORAGE_KEY_WORKSPACE, "broken json");
+  localStorage.setItem(
+    STORAGE_KEY,
+    JSON.stringify({ version: 1, projectName: "旧キーフォールバック", characters: [], lines: [] }),
+  );
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("旧キーフォールバック");
+});
+
+test("workspaceキー・旧キー共に壊れていれば既定にフォールバックする", () => {
+  localStorage.setItem(STORAGE_KEY_WORKSPACE, "broken");
+  localStorage.setItem(STORAGE_KEY, "also broken");
+  const { result } = renderHook(() => useProject());
+  expect(result.current.project.projectName).toBe("新規プロジェクト");
+  expect(result.current.tabs).toHaveLength(1);
+});
+
+// ===== タブ操作 =====
+
+test("newProject でエントリが増えてアクティブが新プロジェクトになる", () => {
+  const { result } = renderHook(() => useProject());
+  const prevActiveId = result.current.activeId;
+  act(() => result.current.newProject());
+  expect(result.current.tabs).toHaveLength(2);
+  expect(result.current.activeId).not.toBe(prevActiveId);
+  expect(result.current.project.projectName).toBe("新規プロジェクト");
+  expect(result.current.project.characters).toHaveLength(0);
+  expect(result.current.project.lines).toHaveLength(0);
+});
+
+test("switchProject でアクティブが切り替わる", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("プロジェクト1"));
+  act(() => result.current.newProject());
+  act(() => result.current.setProjectName("プロジェクト2"));
+  // プロジェクト1のIDに戻す
+  const firstId = result.current.tabs[0]!.id;
+  act(() => result.current.switchProject(firstId));
+  expect(result.current.activeId).toBe(firstId);
+  expect(result.current.project.projectName).toBe("プロジェクト1");
+});
+
+test("switchProject: 存在しない id は no-op", () => {
+  const { result } = renderHook(() => useProject());
+  const prevActiveId = result.current.activeId;
+  act(() => result.current.switchProject("nonexistent-id"));
+  expect(result.current.activeId).toBe(prevActiveId);
+});
+
+test("closeProject: 最後の1エントリは no-op", () => {
+  const { result } = renderHook(() => useProject());
+  const onlyId = result.current.activeId;
+  act(() => result.current.closeProject(onlyId));
+  expect(result.current.tabs).toHaveLength(1);
+  expect(result.current.activeId).toBe(onlyId);
+});
+
+test("closeProject: 閉じたら別エントリがアクティブになる（アクティブを閉じた場合）", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("P1"));
+  act(() => result.current.newProject());
+  act(() => result.current.setProjectName("P2"));
+  const p2Id = result.current.activeId;
+  // P2（アクティブ）を閉じる → P1 がアクティブになるはず
+  act(() => result.current.closeProject(p2Id));
+  expect(result.current.tabs).toHaveLength(1);
+  expect(result.current.project.projectName).toBe("P1");
+});
+
+test("closeProject: 非アクティブエントリを閉じてもアクティブは変わらない", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("P1"));
+  act(() => result.current.newProject());
+  act(() => result.current.setProjectName("P2"));
+  // 今アクティブは P2
+  const p2Id = result.current.activeId;
+  const p1Id = result.current.tabs[0]!.id;
+  // P1（非アクティブ）を閉じる → P2 がアクティブのまま
+  act(() => result.current.closeProject(p1Id));
+  expect(result.current.tabs).toHaveLength(1);
+  expect(result.current.activeId).toBe(p2Id);
+  expect(result.current.project.projectName).toBe("P2");
+});
+
+test("closeProject: 先頭エントリを閉じたとき次のエントリがアクティブになる", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("P1"));
+  const p1Id = result.current.activeId;
+  act(() => result.current.newProject());
+  act(() => result.current.setProjectName("P2"));
+  // P1 に戻してからP1を閉じる
+  act(() => result.current.switchProject(p1Id));
+  act(() => result.current.closeProject(p1Id));
+  expect(result.current.tabs).toHaveLength(1);
+  expect(result.current.project.projectName).toBe("P2");
+});
+
+test("renameProject: 指定エントリのprojectNameを変更する", () => {
+  const { result } = renderHook(() => useProject());
+  const id = result.current.activeId;
+  act(() => result.current.renameProject(id, "新しい名前"));
+  expect(result.current.project.projectName).toBe("新しい名前");
+  expect(result.current.tabs[0]!.name).toBe("新しい名前");
+});
+
+test("renameProject: trim後空は no-op", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("元の名前"));
+  const id = result.current.activeId;
+  act(() => result.current.renameProject(id, "   "));
+  expect(result.current.project.projectName).toBe("元の名前");
+});
+
+test("renameProject: trim して採用する", () => {
+  const { result } = renderHook(() => useProject());
+  const id = result.current.activeId;
+  act(() => result.current.renameProject(id, "  スペース付き  "));
+  expect(result.current.project.projectName).toBe("スペース付き");
+});
+
+test("renameProject: 非アクティブなエントリのtabs.nameも更新される", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("P1"));
+  const p1Id = result.current.activeId;
+  act(() => result.current.newProject());
+  act(() => result.current.setProjectName("P2"));
+  // P1（非アクティブ）をリネーム
+  act(() => result.current.renameProject(p1Id, "P1リネーム"));
+  const p1Tab = result.current.tabs.find((t) => t.id === p1Id)!;
+  expect(p1Tab.name).toBe("P1リネーム");
+  // P2 はアクティブのまま
+  expect(result.current.project.projectName).toBe("P2");
+});
+
+// ===== 既存 mutator がアクティブに作用すること =====
+
+test("addCharacter はアクティブエントリにのみ作用する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("P1"));
+  const p1Id = result.current.activeId;
+  act(() => result.current.newProject()); // P2 がアクティブ
+  act(() => result.current.switchProject(p1Id)); // P1 に戻す
+  act(() => result.current.addCharacter("霊夢"));
+  // P1 にキャラが追加されている
+  expect(result.current.project.characters).toHaveLength(1);
+  // P2 に切り替えたとき P2 にはキャラがいない
+  act(() => result.current.switchProject(result.current.tabs.find((t) => t.id !== p1Id)!.id));
+  expect(result.current.project.characters).toHaveLength(0);
+});
+
+// ===== loadFromFile / importMarkdown が新タブを追加してアクティブにする =====
+
+test("loadFromFile は新タブとして追加しアクティブにする", async () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.setProjectName("元のプロジェクト"));
+  const originalId = result.current.activeId;
+  const ymscript = JSON.stringify({ version: 1, projectName: "読み込んだプロジェクト", characters: [], lines: [] });
+  const file = new File([ymscript], "loaded.ymscript", { type: "application/json" });
+  await act(async () => {
+    await result.current.loadFromFile(file);
+  });
+  expect(result.current.tabs).toHaveLength(2);
+  expect(result.current.activeId).not.toBe(originalId);
+  expect(result.current.project.projectName).toBe("読み込んだプロジェクト");
+  // 元のエントリは保持されている
+  const originalTab = result.current.tabs.find((t) => t.id === originalId)!;
+  expect(originalTab.name).toBe("元のプロジェクト");
 });
 
 test("不正な .ymscript を読み込んでも状態は変わらない（design §8）", async () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.setProjectName("元の名前"));
+  const tabCount = result.current.tabs.length;
   const badFile = new File(["{ not valid json"], "broken.ymscript", { type: "application/json" });
   await expect(
     act(async () => {
@@ -89,36 +309,13 @@ test("不正な .ymscript を読み込んでも状態は変わらない（design
     }),
   ).rejects.toThrow();
   expect(result.current.project.projectName).toBe("元の名前");
+  expect(result.current.tabs).toHaveLength(tabCount);
 });
 
-test("importMarkdown はファイルから状態を置き換え、skippedLines を返す", async () => {
-  const { result } = renderHook(() => useProject());
-  const md = new File(["霊夢: やあ\n不正行\n魔理沙: どうも"], "x.md", { type: "text/markdown" });
-  let skipped = -1;
-  await act(async () => {
-    skipped = await result.current.importMarkdown(md);
-  });
-  expect(skipped).toBe(1);
-  expect(result.current.project.lines.map((l) => l.text)).toEqual(["やあ", "どうも"]);
-});
-
-test("exportCSVToClipboard は全件 CSV をクリップボードへ書く", async () => {
-  const writeText = vi.fn().mockResolvedValue(undefined);
-  Object.assign(navigator, { clipboard: { writeText } });
-  const { result } = renderHook(() => useProject());
-  act(() => result.current.addCharacter("霊夢"));
-  act(() => result.current.addLineAtEnd());
-  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "やあ"));
-  await act(async () => {
-    await result.current.exportCSVToClipboard();
-  });
-  expect(writeText).toHaveBeenCalledWith("霊夢,やあ");
-});
-
-// I-4: JSON として妥当だが version が不正なファイルは reject し、状態を変えない
 test("version:2 の .ymscript は loadFromFile が reject し状態は変わらない（構造不正の異常系）", async () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.setProjectName("元の名前"));
+  const tabCount = result.current.tabs.length;
   const badFile = new File(
     [JSON.stringify({ version: 2, projectName: "X", characters: [], lines: [] })],
     "future.ymscript",
@@ -130,27 +327,28 @@ test("version:2 の .ymscript は loadFromFile が reject し状態は変わら�
     }),
   ).rejects.toThrow();
   expect(result.current.project.projectName).toBe("元の名前");
+  expect(result.current.tabs).toHaveLength(tabCount);
 });
 
-// I-2: addLineAfter は元の行のキャラクターを引き継ぐ
-test("addLineAfter は直前行のキャラクターを引き継ぐ", () => {
+test("importMarkdown は新タブとして追加しアクティブにし skippedLines を返す", async () => {
   const { result } = renderHook(() => useProject());
-  act(() => result.current.addCharacter("霊夢"));
-  act(() => result.current.addCharacter("魔理沙"));
-  act(() => result.current.addLineAtEnd());
-  // 先頭行を2番目キャラ（魔理沙）に変更
-  const marisa = result.current.project.characters[1]!;
-  const firstLineId = result.current.project.lines[0]!.id;
-  act(() => result.current.updateLineCharacter(firstLineId, marisa.id));
-  // 魔理沙の行の直後に追加 → 新規行も魔理沙のはず
-  act(() => result.current.addLineAfter(firstLineId));
-  expect(result.current.project.lines[1]!.characterId).toBe(marisa.id);
+  act(() => result.current.setProjectName("元のプロジェクト"));
+  const originalId = result.current.activeId;
+  const md = new File(["霊夢: やあ\n不正行\n魔理沙: どうも"], "x.md", { type: "text/markdown" });
+  let skipped = -1;
+  await act(async () => {
+    skipped = await result.current.importMarkdown(md);
+  });
+  expect(skipped).toBe(1);
+  expect(result.current.tabs).toHaveLength(2);
+  expect(result.current.activeId).not.toBe(originalId);
+  expect(result.current.project.lines.map((l) => l.text)).toEqual(["やあ", "どうも"]);
+  // 元のエントリは保持されている
+  expect(result.current.tabs.some((t) => t.id === originalId)).toBe(true);
 });
 
-// I-4: 正しい project: キーの完全形式フロントマターあり Markdown を importMarkdown できる
-test("フロントマターあり Markdown を importMarkdown で読み込める", async () => {
+test("フロントマターあり Markdown を importMarkdown で読み込める（新タブとして）", async () => {
   const { result } = renderHook(() => useProject());
-  // parseMarkdown が認識するフロントマター形式: project: + characters: ブロック
   const frontmatter = [
     "---",
     "project: テスト台本",
@@ -167,27 +365,29 @@ test("フロントマターあり Markdown を importMarkdown で読み込める
   await act(async () => {
     skipped = await result.current.importMarkdown(md);
   });
-  // projectName がフロントマターから読み込まれていること
+  // 新タブがアクティブで projectName がフロントマターから読み込まれる
   expect(result.current.project.projectName).toBe("テスト台本");
-  // 本文の2行が読み込まれていること
   expect(result.current.project.lines).toHaveLength(2);
-  // スキップなし
   expect(skipped).toBe(0);
 });
 
-// M-4: moveLine の up 方向
-test("moveLine up は行を1つ上に移動する", () => {
+// ===== exportCSVToClipboard =====
+
+test("exportCSVToClipboard は全件 CSV をクリップボードへ書く", async () => {
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  Object.assign(navigator, { clipboard: { writeText } });
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));
   act(() => result.current.addLineAtEnd());
-  act(() => result.current.addLineAtEnd());
-  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "A"));
-  act(() => result.current.updateLineText(result.current.project.lines[1]!.id, "B"));
-  act(() => result.current.moveLine(result.current.project.lines[1]!.id, "up"));
-  expect(result.current.project.lines.map((l) => l.text)).toEqual(["B", "A"]);
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "やあ"));
+  await act(async () => {
+    await result.current.exportCSVToClipboard();
+  });
+  expect(writeText).toHaveBeenCalledWith("霊夢,やあ");
 });
 
-// M-4: 先頭行の up は no-op
+// ===== moveLine 境界ケース =====
+
 test("moveLine up は先頭行に対して no-op", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));
@@ -199,7 +399,17 @@ test("moveLine up は先頭行に対して no-op", () => {
   expect(result.current.project.lines.map((l) => l.text)).toEqual(["A", "B"]);
 });
 
-// M-4: 末尾行の down は no-op
+test("moveLine up は行を1つ上に移動する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "A"));
+  act(() => result.current.updateLineText(result.current.project.lines[1]!.id, "B"));
+  act(() => result.current.moveLine(result.current.project.lines[1]!.id, "up"));
+  expect(result.current.project.lines.map((l) => l.text)).toEqual(["B", "A"]);
+});
+
 test("moveLine down は末尾行に対して no-op", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));
@@ -211,9 +421,22 @@ test("moveLine down は末尾行に対して no-op", () => {
   expect(result.current.project.lines.map((l) => l.text)).toEqual(["A", "B"]);
 });
 
-// --- v1.2 mutators ---
+// ===== addLineAfter のキャラ引き継ぎ =====
 
-// renameCharacter
+test("addLineAfter は直前行のキャラクターを引き継ぐ", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addCharacter("魔理沙"));
+  act(() => result.current.addLineAtEnd());
+  const marisa = result.current.project.characters[1]!;
+  const firstLineId = result.current.project.lines[0]!.id;
+  act(() => result.current.updateLineCharacter(firstLineId, marisa.id));
+  act(() => result.current.addLineAfter(firstLineId));
+  expect(result.current.project.lines[1]!.characterId).toBe(marisa.id);
+});
+
+// ===== v1.2 mutators =====
+
 test("renameCharacter はキャラクター名を変更する", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));
@@ -230,7 +453,6 @@ test("renameCharacter: 空文字（trim後）は no-op で元の名前を維持�
   expect(result.current.project.characters[0]!.name).toBe("霊夢");
 });
 
-// setCharacterColor
 test("setCharacterColor はキャラクターの色を変更する", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));
@@ -239,7 +461,8 @@ test("setCharacterColor はキャラクターの色を変更する", () => {
   expect(result.current.project.characters[0]!.color).toBe("#123456");
 });
 
-// importPlainText
+// ===== importPlainText =====
+
 test("importPlainText: 既存キャラありで3行テキストを末尾に追加し件数3を返す", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));
@@ -306,7 +529,8 @@ test("importPlainText: 全部空行なら0を返し状態は変わらない", ()
   expect(result.current.project.lines).toHaveLength(0);
 });
 
-// clearAllLines
+// ===== clearAllLines =====
+
 test("clearAllLines は全行を削除しキャラクターは保持する", () => {
   const { result } = renderHook(() => useProject());
   act(() => result.current.addCharacter("霊夢"));

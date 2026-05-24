@@ -1,21 +1,33 @@
 // src/hooks/useProject.ts
 import { useCallback, useEffect, useState } from "react";
-import type { Line, Project } from "../types";
+import type { Line, Project, Workspace } from "../types";
 import { generateId } from "../utils/id";
 import { colorForIndex } from "../utils/color";
 import { buildCSV, buildCSVText } from "../utils/csv";
 import { buildMarkdown, parseMarkdown } from "../utils/markdown";
-import { downloadText, parseProjectFile, readFileAsText, sanitizeFilename } from "../utils/file";
+import { downloadText, parseProjectFile, parseWorkspaceFile, readFileAsText, sanitizeFilename } from "../utils/file";
 
 /**
- * `localStorage` のキー。プロジェクトの永続化に使用する。
+ * `localStorage` の旧キー。マイグレーション時にのみ参照する。
  *
  * @remarks
- * 名前空間プレフィックス `ymm4-script-editor:` により他アプリとの衝突を防ぐ。
+ * v1.3 以降は {@link STORAGE_KEY_WORKSPACE} が永続化の主キーとなる。
+ * 旧キーが存在する場合は1エントリのワークスペースに移行する。
  *
  * @see {@link useProject}
  */
 export const STORAGE_KEY = "ymm4-script-editor:last-project";
+
+/**
+ * `localStorage` のワークスペースキー。v1.3 以降の永続化に使用する。
+ *
+ * @remarks
+ * 名前空間プレフィックス `ymm4-script-editor:` により他アプリとの衝突を防ぐ。
+ * ワークスペース全体（全タブ・アクティブ状態）を JSON 保存する。
+ *
+ * @see {@link useProject}
+ */
+export const STORAGE_KEY_WORKSPACE = "ymm4-script-editor:workspace";
 
 /**
  * `useProject` フックが返すプロジェクト操作 API の型。
@@ -28,11 +40,24 @@ export const STORAGE_KEY = "ymm4-script-editor:last-project";
  * `saveToFile` / `exportCSV` / `exportMarkdown` / `exportCSVToClipboard` は
  * `project` の現在値を直接参照するため `[project]` 依存になる。
  *
+ * タブ操作（`tabs` / `activeId` / `newProject` / `switchProject` / `closeProject` /
+ * `renameProject`）は v1.3 で追加したワークスペース操作 API。
+ *
  * @see {@link useProject}
  */
 export type UseProjectReturn = {
-  /** 現在のプロジェクト状態（読み取り専用参照）。 */
+  /** 現在のプロジェクト状態（読み取り専用参照）。アクティブエントリの project。 */
   project: Project;
+  /**
+   * タブ表示用の一覧。name = project.projectName。
+   *
+   * @remarks
+   * `isEmpty` は `project.lines.length === 0` の導出値。
+   * 閉じる前に中身があるかどうかを UI 側で判断するために提供する（F-113）。
+   */
+  tabs: { id: string; name: string; isEmpty: boolean }[];
+  /** 現在アクティブなエントリの id。 */
+  activeId: string;
   /** プロジェクト名を更新する。 */
   setProjectName: (name: string) => void;
   /**
@@ -146,7 +171,10 @@ export type UseProjectReturn = {
    */
   saveToFile: () => void; // .ymscript
   /**
-   * `.ymscript` ファイルを読み込んでプロジェクトを復元する。
+   * `.ymscript` ファイルを読み込んで新規タブとして追加しアクティブにする。
+   *
+   * @remarks
+   * §8-2: 読込は現アクティブを置換せず、新規エントリとして追加する。
    *
    * @param file - ユーザーが選択した `.ymscript` ファイル
    * @returns 読み込み完了の Promise（失敗時は reject）
@@ -167,7 +195,10 @@ export type UseProjectReturn = {
    */
   exportMarkdown: () => void; // 完全形式 .md
   /**
-   * Markdown ファイルを読み込んでプロジェクトを更新する。
+   * Markdown ファイルを読み込んで新規タブとして追加しアクティブにする。
+   *
+   * @remarks
+   * §8-2: 読込は現アクティブを置換せず、新規エントリとして追加する。
    *
    * @param file - ユーザーが選択した `.md` ファイル
    * @returns スキップした行数（パースできなかった行の件数）
@@ -181,75 +212,165 @@ export type UseProjectReturn = {
    * Clipboard API が利用できない場合は reject する。
    */
   exportCSVToClipboard: () => Promise<void>; // 全件コピー（F-51）
+  /**
+   * 空の既定プロジェクトを新エントリとして追加し、それをアクティブにする。
+   */
+  newProject: () => void;
+  /**
+   * 指定 id のエントリをアクティブにする。
+   *
+   * @param id - アクティブにするエントリの id
+   */
+  switchProject: (id: string) => void;
+  /**
+   * 指定 id のエントリを閉じる。
+   *
+   * @remarks
+   * 最後の1エントリは no-op（常に最低1プロジェクト存在）。
+   * 閉じたエントリがアクティブだった場合、隣接する別エントリをアクティブにする。
+   *
+   * @param id - 閉じるエントリの id
+   */
+  closeProject: (id: string) => void;
+  /**
+   * 指定 id のエントリの projectName を変更する。
+   *
+   * @remarks
+   * `name.trim()` が空文字列の場合は no-op。
+   *
+   * @param id - 変更対象のエントリの id
+   * @param name - 新しいプロジェクト名
+   */
+  renameProject: (id: string, name: string) => void;
 };
 
 // 関数にする理由: 毎回新しいオブジェクトを返し、複数の呼び出し元が参照を共有しないようにするため。
 const defaultProject = (): Project => ({ version: 1, projectName: "新規プロジェクト", characters: [], lines: [] });
 
-// localStorage から復元を試みる。壊れた値は握り潰して defaultProject にフォールバック。
-// parseProjectFile が version チェックや構造検証を行うため、部分破損も安全に扱える。
-const restoreProjectFromStorage = (): Project => {
+const defaultWorkspace = (): Workspace => {
+  const id = generateId();
+  return { version: 1, activeId: id, entries: [{ id, project: defaultProject() }] };
+};
+
+/**
+ * localStorage からワークスペースを復元する。
+ *
+ * @remarks
+ * 復元ロジック（優先順位順）:
+ * 1. `STORAGE_KEY_WORKSPACE` に有効な Workspace があれば採用。
+ * 2. 旧キー `STORAGE_KEY` に有効な Project があれば1エントリのワークスペースに移行。
+ * 3. どちらも無ければ既定ワークスペース（空プロジェクト1つ）。
+ *
+ * 壊れた値は握り潰して次の候補へフォールバックする。
+ */
+const restoreWorkspaceFromStorage = (): Workspace => {
+  // 1. workspace キーを試みる
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY_WORKSPACE);
+    if (raw) return parseWorkspaceFile(JSON.parse(raw));
+  } catch {
+    // 壊れていれば次の候補へ
+  }
+
+  // 2. 旧キーからのマイグレーション
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return defaultProject();
-    return parseProjectFile(JSON.parse(raw));
+    if (raw) {
+      const project = parseProjectFile(JSON.parse(raw));
+      const id = generateId();
+      return { version: 1, activeId: id, entries: [{ id, project }] };
+    }
   } catch {
-    return defaultProject();
+    // 壊れていれば既定へ
   }
+
+  // 3. 既定ワークスペース
+  return defaultWorkspace();
 };
 
 const newLine = (characterId: string): Line => ({ id: generateId(), characterId, text: "" });
 
 /**
+ * アクティブエントリの project を updater で差し替えたワークスペースを返すヘルパー型。
+ *
+ * @internal
+ */
+const updateActiveProject = (w: Workspace, updater: (p: Project) => Project): Workspace => {
+  return {
+    ...w,
+    entries: w.entries.map((e) => (e.id === w.activeId ? { ...e, project: updater(e.project) } : e)),
+  };
+};
+
+/**
  * プロジェクト全体の状態管理と永続化を提供するカスタムフック。
  *
  * @remarks
- * - プロジェクト状態は `localStorage`（キー: {@link STORAGE_KEY}）に自動永続化される。
- * - 起動時に `localStorage` から復元を試みる（壊れた値は `defaultProject` にフォールバック）。
- * - ミューテーター（`setProjectName` 〜 `moveLine`）は `updater` 形式の `setProject` を使い、
- *   外部依存ゼロで `useCallback([])` による安定参照を実現する（要件 NF-10）。
+ * - ワークスペース状態は `localStorage`（キー: {@link STORAGE_KEY_WORKSPACE}）に自動永続化される。
+ * - 起動時に `localStorage` から復元を試みる（旧キー移行・壊れた値は `defaultWorkspace` にフォールバック）。
+ * - 既存 mutator（`setProjectName` 〜 `clearAllLines`）は常に**アクティブエントリの project** に作用する。
+ *   内部的には `setWorkspace(w => updateActiveProject(w, updater))` 形式で実装し、安定参照を維持する。
  * - `saveToFile` / `exportCSV` / `exportMarkdown` / `exportCSVToClipboard` は
  *   `project` の現在値を参照するため `[project]` 依存になる。
+ * - `loadFromFile` / `importMarkdown` は §8-2 に従い、新規タブとして追加してアクティブにする。
  *
  * @returns {@link UseProjectReturn} — プロジェクト状態とミューテーター一式
  *
  * @example
  * ```ts
  * function App() {
- *   const { project, addCharacter, addLineAtEnd, exportCSV } = useProject();
- *   return <div>{project.projectName}</div>;
+ *   const { project, tabs, activeId, addCharacter, newProject, switchProject } = useProject();
+ *   return <div>{project.projectName} — タブ数: {tabs.length}</div>;
  * }
  * ```
  *
  * @see {@link UseProjectReturn}
- * @see {@link STORAGE_KEY}
+ * @see {@link STORAGE_KEY_WORKSPACE}
  */
 export const useProject = (): UseProjectReturn => {
-  const [project, setProject] = useState<Project>(restoreProjectFromStorage);
+  const [workspace, setWorkspace] = useState<Workspace>(restoreWorkspaceFromStorage);
 
-  // project が変わるたびに localStorage へ永続化する。
-  // useState の初期化関数 restoreProjectFromStorage が復元を担うので、保存と復元のループは起きない。
+  // workspace が変わるたびに localStorage へ永続化する。
   useEffect(() => {
     try {
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(project));
+      localStorage.setItem(STORAGE_KEY_WORKSPACE, JSON.stringify(workspace));
     } catch (e) {
       console.error("localStorage への保存に失敗しました", e);
     }
-  }, [project]);
+  }, [workspace]);
 
-  // --- mutator はすべて setProject の updater 形式 → 外部依存ゼロ → useCallback([]) で安定参照 ---
-  // updater 形式を使う理由: 連続 act() で状態をバッチ更新しても常に最新の p を参照できる。
+  // アクティブエントリの project を導出する（レンダー内で毎回計算、useCallback 不要）。
+  // entries は不変条件 length >= 1 かつ activeId は必ず entries に存在するため非 null アサーション安全。
+  const activeEntry = workspace.entries.find((e) => e.id === workspace.activeId)!;
+  const project = activeEntry.project;
+
+  // tabs: 表示用（id + name + isEmpty）。isEmpty は lines.length === 0 の導出値。
+  // useMemo 不要: レンダー毎の計算コストは配列マップのみで軽量。
+  const tabs = workspace.entries.map((e) => ({
+    id: e.id,
+    name: e.project.projectName,
+    isEmpty: e.project.lines.length === 0,
+  }));
+  const { activeId } = workspace;
+
+  // --- mutator はすべて setWorkspace の updater 形式 → 外部依存ゼロ → useCallback([]) で安定参照 ---
+  // updater 形式を使う理由: 連続 act() で状態をバッチ更新しても常に最新の w を参照できる。
   // useCallback([]) で参照を固定する理由: LineRow を React.memo 化した際、ハンドラが毎レンダ
   // で再生成されると memo の恩恵がなくなる（NF-10 性能要件）。
 
-  const setProjectName = useCallback((name: string) => setProject((p) => ({ ...p, projectName: name })), []);
+  const setProjectName = useCallback(
+    (name: string) => setWorkspace((w) => updateActiveProject(w, (p) => ({ ...p, projectName: name }))),
+    [],
+  );
 
   const addCharacter = useCallback(
     (name: string) =>
-      setProject((p) => ({
-        ...p,
-        characters: [...p.characters, { id: generateId(), name, color: colorForIndex(p.characters.length) }],
-      })),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => ({
+          ...p,
+          characters: [...p.characters, { id: generateId(), name, color: colorForIndex(p.characters.length) }],
+        })),
+      ),
     [],
   );
 
@@ -258,83 +379,100 @@ export const useProject = (): UseProjectReturn => {
   // fallback は「削除対象でない最初のキャラ」。該当 Line を付け替えることで孤児を作らない（F-04）。
   const deleteCharacter = useCallback(
     (id: string) =>
-      setProject((p) => {
-        if (p.characters.length <= 1) return p; // 最後の1キャラは削除不可
-        const fallbackId = p.characters.find((c) => c.id !== id)?.id ?? "";
-        return {
-          ...p,
-          characters: p.characters.filter((c) => c.id !== id),
-          lines: p.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
-        };
-      }),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => {
+          if (p.characters.length <= 1) return p; // 最後の1キャラは削除不可
+          const fallbackId = p.characters.find((c) => c.id !== id)?.id ?? "";
+          return {
+            ...p,
+            characters: p.characters.filter((c) => c.id !== id),
+            lines: p.lines.map((l) => (l.characterId === id ? { ...l, characterId: fallbackId } : l)),
+          };
+        }),
+      ),
     [],
   );
 
   // 文脈がないため先頭キャラを割り当てる。
   const addLineAtEnd = useCallback(
     () =>
-      setProject((p) => {
-        const first = p.characters[0];
-        if (!first) return p; // キャラ未登録なら no-op
-        return { ...p, lines: [...p.lines, newLine(first.id)] };
-      }),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => {
+          const first = p.characters[0];
+          if (!first) return p; // キャラ未登録なら no-op
+          return { ...p, lines: [...p.lines, newLine(first.id)] };
+        }),
+      ),
     [],
   );
 
   // 直後に追加する行は元の行のキャラを引き継ぐ（同一話者の連続入力が自然なため）。
-  // 末尾追加 addLineAtEnd は文脈がないので先頭キャラを使う。
-  // afterId の行が見つからない・登録キャラがいない場合のフォールバックは先頭キャラ。
   // splice はローカルコピーに対してのみ使用。元の p.lines は変更しない（イミュータブル）。
   const addLineAfter = useCallback(
     (afterId: string) =>
-      setProject((p) => {
-        const first = p.characters[0];
-        if (!first) return p; // キャラ未登録なら no-op
-        const idx = p.lines.findIndex((l) => l.id === afterId);
-        if (idx === -1) return p;
-        const sourceLine = p.lines[idx];
-        const inheritedCharId = p.characters.some((c) => c.id === sourceLine?.characterId)
-          ? (sourceLine?.characterId ?? first.id)
-          : first.id;
-        const next = [...p.lines];
-        next.splice(idx + 1, 0, newLine(inheritedCharId));
-        return { ...p, lines: next };
-      }),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => {
+          const first = p.characters[0];
+          if (!first) return p; // キャラ未登録なら no-op
+          const idx = p.lines.findIndex((l) => l.id === afterId);
+          if (idx === -1) return p;
+          const sourceLine = p.lines[idx];
+          const inheritedCharId = p.characters.some((c) => c.id === sourceLine?.characterId)
+            ? (sourceLine?.characterId ?? first.id)
+            : first.id;
+          const next = [...p.lines];
+          next.splice(idx + 1, 0, newLine(inheritedCharId));
+          return { ...p, lines: next };
+        }),
+      ),
     [],
   );
 
   const deleteLine = useCallback(
-    (id: string) => setProject((p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id) })),
+    (id: string) =>
+      setWorkspace((w) => updateActiveProject(w, (p) => ({ ...p, lines: p.lines.filter((l) => l.id !== id) }))),
     [],
   );
 
   const updateLineCharacter = useCallback(
     (lineId: string, characterId: string) =>
-      setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, characterId } : l)) })),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => ({
+          ...p,
+          lines: p.lines.map((l) => (l.id === lineId ? { ...l, characterId } : l)),
+        })),
+      ),
     [],
   );
 
   const updateLineText = useCallback(
     (lineId: string, text: string) =>
-      setProject((p) => ({ ...p, lines: p.lines.map((l) => (l.id === lineId ? { ...l, text } : l)) })),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => ({
+          ...p,
+          lines: p.lines.map((l) => (l.id === lineId ? { ...l, text } : l)),
+        })),
+      ),
     [],
   );
 
   const moveLine = useCallback(
     (id: string, direction: "up" | "down") =>
-      setProject((p) => {
-        const idx = p.lines.findIndex((l) => l.id === id);
-        if (idx === -1) return p;
-        const target = direction === "up" ? idx - 1 : idx + 1;
-        if (target < 0 || target >= p.lines.length) return p;
-        const next = [...p.lines];
-        // 範囲チェック済みのためどちらも必ず存在する。一時変数で swap を明示する。
-        const lineAtIdx = next[idx]!;
-        const lineAtTarget = next[target]!;
-        next[idx] = lineAtTarget;
-        next[target] = lineAtIdx;
-        return { ...p, lines: next };
-      }),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => {
+          const idx = p.lines.findIndex((l) => l.id === id);
+          if (idx === -1) return p;
+          const target = direction === "up" ? idx - 1 : idx + 1;
+          if (target < 0 || target >= p.lines.length) return p;
+          const next = [...p.lines];
+          // 範囲チェック済みのためどちらも必ず存在する。一時変数で swap を明示する。
+          const lineAtIdx = next[idx]!;
+          const lineAtTarget = next[target]!;
+          next[idx] = lineAtTarget;
+          next[target] = lineAtIdx;
+          return { ...p, lines: next };
+        }),
+      ),
     [],
   );
 
@@ -343,29 +481,33 @@ export const useProject = (): UseProjectReturn => {
   // name.trim() が空なら no-op（元の名前を維持）。trim した名前を採用する。
   const renameCharacter = useCallback(
     (id: string, name: string) =>
-      setProject((p) => {
-        const trimmed = name.trim();
-        if (!trimmed) return p; // 空文字は no-op
-        return {
-          ...p,
-          characters: p.characters.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
-        };
-      }),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => {
+          const trimmed = name.trim();
+          if (!trimmed) return p; // 空文字は no-op
+          return {
+            ...p,
+            characters: p.characters.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
+          };
+        }),
+      ),
     [],
   );
 
   const setCharacterColor = useCallback(
     (id: string, color: string) =>
-      setProject((p) => ({
-        ...p,
-        characters: p.characters.map((c) => (c.id === id ? { ...c, color } : c)),
-      })),
+      setWorkspace((w) =>
+        updateActiveProject(w, (p) => ({
+          ...p,
+          characters: p.characters.map((c) => (c.id === id ? { ...c, color } : c)),
+        })),
+      ),
     [],
   );
 
   // text を改行で分割 → trim → 空行スキップ。
   // 0行（全部空行）なら状態変更なし・キャラ自動作成もせず 0 を返す。
-  // 0人時は「キャラ1」を自動作成し、characters と lines を1回の setProject で更新する。
+  // 0人時は「キャラ1」を自動作成し、characters と lines を1回の setWorkspace で更新する。
   // 返り値は updater の外で算出（updater は値を返せないため）。
   const importPlainText = useCallback((text: string): number => {
     const parsed = text
@@ -375,28 +517,33 @@ export const useProject = (): UseProjectReturn => {
 
     if (parsed.length === 0) return 0;
 
-    setProject((p) => {
-      let characters = p.characters;
-      let characterId: string;
+    setWorkspace((w) =>
+      updateActiveProject(w, (p) => {
+        let characters = p.characters;
+        let characterId: string;
 
-      if (characters.length === 0) {
-        // キャラが0人なら「キャラ1」を自動作成する。
-        const newChar = { id: generateId(), name: "キャラ1", color: colorForIndex(0) };
-        characters = [newChar];
-        characterId = newChar.id;
-      } else {
-        // noUncheckedIndexedAccess のため非 null アサーション: length > 0 を確認済み。
-        characterId = characters[0]!.id;
-      }
+        if (characters.length === 0) {
+          // キャラが0人なら「キャラ1」を自動作成する。
+          const newChar = { id: generateId(), name: "キャラ1", color: colorForIndex(0) };
+          characters = [newChar];
+          characterId = newChar.id;
+        } else {
+          // noUncheckedIndexedAccess のため非 null アサーション: length > 0 を確認済み。
+          characterId = characters[0]!.id;
+        }
 
-      const newLines = parsed.map((lineText) => ({ id: generateId(), characterId, text: lineText }));
-      return { ...p, characters, lines: [...p.lines, ...newLines] };
-    });
+        const newLines = parsed.map((lineText) => ({ id: generateId(), characterId, text: lineText }));
+        return { ...p, characters, lines: [...p.lines, ...newLines] };
+      }),
+    );
 
     return parsed.length;
   }, []);
 
-  const clearAllLines = useCallback(() => setProject((p) => ({ ...p, lines: [] })), []);
+  const clearAllLines = useCallback(
+    () => setWorkspace((w) => updateActiveProject(w, (p) => ({ ...p, lines: [] }))),
+    [],
+  );
 
   // --- [project] 依存: saveToFile / exportCSV / exportMarkdown / exportCSVToClipboard ---
   // これらは project の現在値を関数実行時に読むため、updater 形式が使えず [project] 依存。
@@ -407,12 +554,18 @@ export const useProject = (): UseProjectReturn => {
     downloadText(JSON.stringify(project, null, 2), `${base}.ymscript`, "application/json");
   }, [project]);
 
-  // --- [] 独立: loadFromFile / importMarkdown ---
-  // これらは project を参照せず、parse 後に setProject で上書きするだけなので [] で安定参照。
+  // --- § 8-2: loadFromFile / importMarkdown は新規タブとして追加してアクティブにする ---
+  // setWorkspace の updater 形式で workspace 全体を更新するため [] で安定参照。
 
   const loadFromFile = useCallback(async (file: File) => {
     const text = await readFileAsText(file);
-    setProject(parseProjectFile(JSON.parse(text)));
+    const loaded = parseProjectFile(JSON.parse(text));
+    const newId = generateId();
+    setWorkspace((w) => ({
+      ...w,
+      activeId: newId,
+      entries: [...w.entries, { id: newId, project: loaded }],
+    }));
   }, []);
 
   const exportCSV = useCallback(() => {
@@ -425,11 +578,16 @@ export const useProject = (): UseProjectReturn => {
     downloadText(buildMarkdown(project), `${base}.md`, "text/markdown;charset=utf-8");
   }, [project]);
 
-  // project を読まないため [] で安定参照（loadFromFile と同じ）。
+  // § 8-2: importMarkdown も新規タブとして追加してアクティブにする。
   const importMarkdown = useCallback(async (file: File): Promise<number> => {
     const text = await readFileAsText(file);
     const { project: parsed, skippedLines } = parseMarkdown(text);
-    setProject(parsed);
+    const newId = generateId();
+    setWorkspace((w) => ({
+      ...w,
+      activeId: newId,
+      entries: [...w.entries, { id: newId, project: parsed }],
+    }));
     return skippedLines;
   }, []);
 
@@ -437,8 +595,56 @@ export const useProject = (): UseProjectReturn => {
     await navigator.clipboard.writeText(buildCSVText(project));
   }, [project]);
 
+  // --- v1.3 ワークスペース操作 ---
+
+  const newProject = useCallback(() => {
+    const newId = generateId();
+    setWorkspace((w) => ({
+      ...w,
+      activeId: newId,
+      entries: [...w.entries, { id: newId, project: defaultProject() }],
+    }));
+  }, []);
+
+  const switchProject = useCallback((id: string) => {
+    setWorkspace((w) => {
+      if (!w.entries.some((e) => e.id === id)) return w; // 存在しない id は no-op
+      return { ...w, activeId: id };
+    });
+  }, []);
+
+  const closeProject = useCallback((id: string) => {
+    setWorkspace((w) => {
+      if (w.entries.length <= 1) return w; // 最後の1エントリは no-op
+      const remaining = w.entries.filter((e) => e.id !== id);
+      // 閉じたエントリがアクティブだった場合、隣接する別エントリをアクティブにする。
+      // 閉じる前のインデックスを参照し、前のエントリ（なければ次）を選ぶ。
+      let nextActiveId = w.activeId;
+      if (w.activeId === id) {
+        const closedIdx = w.entries.findIndex((e) => e.id === id);
+        const prev = w.entries[closedIdx - 1];
+        const next = w.entries[closedIdx + 1];
+        // noUncheckedIndexedAccess: prev/next は undefined の可能性があるため optional chaining。
+        // remaining.length >= 1 の不変条件により remaining[0] は必ず存在する。
+        nextActiveId = (prev ?? next ?? remaining[0])!.id;
+      }
+      return { ...w, activeId: nextActiveId, entries: remaining };
+    });
+  }, []);
+
+  const renameProject = useCallback((id: string, name: string) => {
+    const trimmed = name.trim();
+    if (!trimmed) return; // 空文字は no-op
+    setWorkspace((w) => ({
+      ...w,
+      entries: w.entries.map((e) => (e.id === id ? { ...e, project: { ...e.project, projectName: trimmed } } : e)),
+    }));
+  }, []);
+
   return {
     project,
+    tabs,
+    activeId,
     setProjectName,
     addCharacter,
     deleteCharacter,
@@ -458,5 +664,9 @@ export const useProject = (): UseProjectReturn => {
     exportMarkdown,
     importMarkdown,
     exportCSVToClipboard,
+    newProject,
+    switchProject,
+    closeProject,
+    renameProject,
   };
 };

@@ -7,10 +7,12 @@
   position: relative;
   z-index: 1;
   display: grid;
-  grid-template-rows: 52px 1fr;
+  /* tabs 行を header 直下に追加（34px 固定高）。side/main が残り全体を取る。 */
+  grid-template-rows: 52px 34px 1fr;
   grid-template-columns: 260px 1fr;
   grid-template-areas:
     "header header"
+    "tabs   tabs"
     "side   main";
   height: 100vh;
 }
@@ -119,7 +121,7 @@
  */
 .marqueeTrack {
   position: absolute;
-  top: 58px;          /* ヘッダー (52px) + 微小マージン */
+  top: 92px;          /* ヘッダー (52px) + タブ行 (34px) + 微小マージン */
   left: 0;
   width: max-content;
   white-space: nowrap;

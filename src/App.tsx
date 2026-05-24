@@ -7,6 +7,7 @@ import { BgCanvas } from "./components/BgCanvas/BgCanvas";
 import { OpeningOverlay } from "./components/OpeningOverlay/OpeningOverlay";
 import { PasteImportModal } from "./components/PasteImportModal";
 import { ConfirmDialog } from "./components/ConfirmDialog";
+import { ProjectTabs } from "./components/ProjectTabs";
 import { ToastViewport } from "./components/Toast";
 import type { ToastEntry } from "./components/Toast";
 import { buildLineCSV } from "./utils/csv";
@@ -44,6 +45,8 @@ const MARQUEE_TEXT = "YMM4 ▸ SCRIPT ▸ EDITOR ▸ YMM4台本エディタ ▸ 
 export default function App() {
   const {
     project,
+    tabs,
+    activeId,
     setProjectName,
     addCharacter,
     deleteCharacter,
@@ -63,6 +66,10 @@ export default function App() {
     exportCSVToClipboard,
     importPlainText,
     clearAllLines,
+    newProject,
+    switchProject,
+    closeProject,
+    renameProject,
   } = useProject();
 
   // ===== トースト通知 =====
@@ -88,6 +95,11 @@ export default function App() {
   const [pasteImportOpen, setPasteImportOpen] = useState(false);
   const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
 
+  // ===== タブ閉じ確認（F-113）=====
+  // closeTargetId: 確認ダイアログを表示中のタブ ID（null = 非表示）。
+  // isEmpty=false のタブを閉じようとしたとき、ここに id を保持して ConfirmDialog を開く。
+  const [closeTargetId, setCloseTargetId] = useState<string | null>(null);
+
   // ===== 全行リセット退場アニメーション (§4.7) =====
   // isResetting: true の間 ScriptEditor の .lines に fadeout クラスを付与。
   // prefers-reduced-motion: reduce では 即時クリア（タイマー不要）。
@@ -101,6 +113,34 @@ export default function App() {
 
   const handleOpenResetAll = useCallback(() => setResetConfirmOpen(true), []);
   const handleCloseResetAll = useCallback(() => setResetConfirmOpen(false), []);
+
+  // タブ閉じ要求ハンドラ（F-113）:
+  //   - isEmpty=true → 即 closeProject（確認不要）
+  //   - isEmpty=false → closeTargetId にセットして ConfirmDialog を開く
+  // tabs は毎レンダーで再計算される配列だが、find コストは軽量のため [tabs] 依存でOK。
+  const handleTabClose = useCallback(
+    (id: string) => {
+      const tab = tabs.find((t) => t.id === id);
+      if (!tab) return;
+      if (tab.isEmpty) {
+        closeProject(id);
+      } else {
+        setCloseTargetId(id);
+      }
+    },
+    [tabs, closeProject],
+  );
+
+  const handleConfirmTabClose = useCallback(() => {
+    if (closeTargetId !== null) {
+      closeProject(closeTargetId);
+      setCloseTargetId(null);
+    }
+  }, [closeProject, closeTargetId]);
+
+  const handleCancelTabClose = useCallback(() => {
+    setCloseTargetId(null);
+  }, []);
 
   // コピペインポート実行: n行追加をトーストで通知（n=0 は何もしない）
   const handleImportPlainText = useCallback(
@@ -236,6 +276,14 @@ export default function App() {
           onOpenResetAll={handleOpenResetAll}
           canResetAll={project.lines.length > 0}
         />
+        <ProjectTabs
+          tabs={tabs}
+          activeId={activeId}
+          onSwitch={switchProject}
+          onNew={newProject}
+          onClose={handleTabClose}
+          onRename={renameProject}
+        />
         <CharacterPanel
           characters={project.characters}
           onAdd={addCharacter}
@@ -271,6 +319,18 @@ export default function App() {
         danger
         onConfirm={handleConfirmReset}
         onClose={handleCloseResetAll}
+      />
+
+      {/* ===== タブ閉じ確認ダイアログ（F-113）===== */}
+      <ConfirmDialog
+        open={closeTargetId !== null}
+        title="タブを閉じますか？"
+        message="このプロジェクトの台本は破棄されます。元に戻せません。"
+        confirmLabel="閉じる"
+        cancelLabel="キャンセル"
+        danger
+        onConfirm={handleConfirmTabClose}
+        onClose={handleCancelTabClose}
       />
 
       {/* ===== トースト通知ビューポート (body 直下 createPortal) ===== */}
