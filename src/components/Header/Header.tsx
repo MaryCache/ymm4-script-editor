@@ -149,7 +149,7 @@ export function Header(props: HeaderProps) {
       {/* ===== Left: brand mark + project name ===== */}
       <div className={styles.brand}>
         {/* ユーザー提供のタイトルロゴ画像。装飾なので alt は空 + aria-hidden。 */}
-        <img className={styles.brandLogo} src="/header-logo.png" alt="" aria-hidden="true" />
+        <img className={styles.brandLogo} src={`${import.meta.env.BASE_URL}header-logo.png`} alt="" aria-hidden="true" />
         <div className={styles.brandSep} aria-hidden="true" />
         <input
           className={styles.projectName}

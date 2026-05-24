@@ -5,6 +5,11 @@ import { VitePWA } from "vite-plugin-pwa";
 // アイコンはユーザー提供の透過 PNG（public/icon-192.png / icon-512.png、元 1024px から縮小）。
 // background/theme color は cold-blue-black テーマに合わせる。
 export default defineConfig({
+  // GitHub Pages プロジェクトサイトはサブパス配信のため base を合わせる。
+  // 例: https://marycache.github.io/ymm4-script-editor/
+  // これにより生成アセットの URL・vite-plugin-pwa の manifest scope/start_url・SW 登録パスが
+  // すべて base 配下に揃う。ルート配信のホストへ移す場合は "/" に戻す。
+  base: "/ymm4-script-editor/",
   plugins: [
     react(),
     VitePWA({
@@ -13,7 +18,8 @@ export default defineConfig({
       manifest: {
         name: "YMM4台本エディタ",
         short_name: "台本エディタ",
-        start_url: "/",
+        // start_url は base 配下に。scope (= base) の外だとインストール時に無効になるため。
+        start_url: "/ymm4-script-editor/",
         // display_override: インストール済みウィンドウの外観を上位から順に試す。
         //   window-controls-overlay … タイトルバーをアプリ側で描画し OS のウィンドウ
         //     コントロール(最小/最大/閉じる)だけを重ねる＝ネイティブアプリ風ウィンドウ。

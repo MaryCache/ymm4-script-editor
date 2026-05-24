@@ -119,7 +119,9 @@ export function OpeningOverlay() {
         </div>
 
         {/* ===== タイトルロゴ（最前面）===== */}
-        <img className={styles.logo} src="/opening-logo.png" alt="YMM4台本エディタ" />
+        {/* public 配下の画像は base 込みで参照（GitHub Pages のサブパス配信対応）。
+            Vite は JS 文字列内の "/..." を書き換えないため import.meta.env.BASE_URL を前置する。 */}
+        <img className={styles.logo} src={`${import.meta.env.BASE_URL}opening-logo.png`} alt="YMM4台本エディタ" />
       </div>
     </div>
   );
