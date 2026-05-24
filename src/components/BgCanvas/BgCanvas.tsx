@@ -55,6 +55,25 @@ function makeParticles(count: number): Particle[] {
   return particles;
 }
 
+/**
+ * バックグラウンドの粒子視差アニメーションを描画する装飾用 Canvas コンポーネント。
+ *
+ * @remarks
+ * 外部ライブラリに依存しない vanilla canvas で Three.js 相当の視差効果を実現する
+ * （要件 NF-02/03 ADR 依存最小）。
+ *
+ * 特性:
+ * - 52粒の淡い cyan ドットを `requestAnimationFrame` で毎フレーム描画する。
+ * - `pointermove` イベントでポインタ位置に応じた視差シフトを加える。
+ * - `prefers-reduced-motion: reduce` 時は rAF を回さず静止キャンバスのまま。
+ * - `document.hidden` 時は rAF を一時停止してバックグラウンドの CPU 消費を防ぐ。
+ * - `devicePixelRatio` に対応し、HiDPI ディスプレイで鮮明に表示する。
+ * - アンマウント時に rAF / イベントリスナー / visibilitychange をすべて解除する。
+ *
+ * アクセシビリティ:
+ * - `aria-hidden="true"` + `role="presentation"` で支援技術から非可視にする。
+ * - `pointer-events: none` でインタラクションを背面に貫通させる。
+ */
 export function BgCanvas() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
 

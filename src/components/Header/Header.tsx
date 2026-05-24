@@ -10,14 +10,39 @@ import {
 } from "react";
 import styles from "./Header.module.css";
 
+/**
+ * `Header` コンポーネントの props 型。
+ *
+ * @see {@link Header}
+ */
 export type HeaderProps = {
+  /** 現在のプロジェクト名（プロジェクト名入力欄の制御値）。 */
   projectName: string;
+  /**
+   * プロジェクト名変更のコールバック。
+   *
+   * @param name - 新しいプロジェクト名
+   */
   onProjectNameChange: (name: string) => void;
+  /** `.ymscript` として保存するコールバック。 */
   onSaveYmscript: () => void;
+  /** `.md` として保存するコールバック。 */
   onSaveMarkdown: () => void;
+  /** CSV を書き出すコールバック。 */
   onExportCSV: () => void;
+  /**
+   * `.ymscript` ファイルを読み込むコールバック。
+   *
+   * @param file - ユーザーが選択したファイル
+   */
   onLoadYmscript: (file: File) => void;
+  /**
+   * `.md` ファイルを読み込むコールバック。
+   *
+   * @param file - ユーザーが選択したファイル
+   */
   onLoadMarkdown: (file: File) => void;
+  /** 全件コピーのコールバック（要件 F-51）。 */
   onCopyAll: () => void;
 };
 
@@ -45,6 +70,25 @@ function useOutsideClick(
   }, [ref, onClose, enabled]);
 }
 
+/**
+ * アプリのグローバルヘッダーコンポーネント。
+ *
+ * @remarks
+ * プロジェクト名入力と、保存・読込・全件コピーのドロップダウンメニューを提供する。
+ *
+ * メニュー制御:
+ * - 「保存」「読込」は排他制御（一方を開くともう一方が閉じる）。
+ * - メニュー外クリック（`mousedown`）または `Escape` キーで閉じる。
+ * - メニューを開いた直後、最初の menuitem にフォーカスを移す（ARIA keyboard a11y）。
+ *
+ * アクセシビリティ:
+ * - `aria-haspopup="menu"` + `aria-expanded` でスクリーンリーダーにメニュー状態を通知。
+ * - ファイル入力は `hidden` + `aria-label` で AT から名前付きフィールドとして識別可能。
+ * - `Escape` キーはヘッダールート要素の `onKeyDown` で受け取るため、
+ *   プロジェクト名入力にフォーカスがある状態でも機能する。
+ *
+ * @param props - {@link HeaderProps}
+ */
 export function Header(props: HeaderProps) {
   // props オブジェクト全体は毎レンダーで新しい参照になるため、
   // useCallback の依存に個別の関数を書けるよう分割代入する（exhaustive-deps 対策）。

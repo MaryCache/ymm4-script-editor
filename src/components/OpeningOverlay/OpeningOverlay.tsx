@@ -51,6 +51,25 @@ const T_ENTER = 1000; // 図形モーション + ロゴ出現の尺 (ms)
 const T_IDLE = 350; // アイドル (ms)
 const T_EXIT = 550; // loading-exit (ms)
 
+/**
+ * アプリ起動時に一度だけ表示するオープニング演出コンポーネント。
+ *
+ * @remarks
+ * 以下の条件でいずれかを満たした場合は `null` を返し演出をスキップする:
+ * - `prefers-reduced-motion: reduce` が有効
+ * - 同一セッション内で既に演出を表示済み（`sessionStorage` で管理）
+ *
+ * 表示フェーズ: `enter` → `idle` → `exit` → `done`（`done` で `null` を返す）
+ *
+ * アクセシビリティ:
+ * - `aria-hidden="true"` で支援技術から非可視にする。
+ * - フォーカストラップは設けない（短時間で自動消滅するため）。
+ * - 背面のコンテンツ（`.app`）は最初から DOM に存在し、オーバーレイが上に重なるだけ。
+ *
+ * Strict Mode 対応:
+ * - `timerStartedRef` で二重マウント時のタイマー重複を防ぐ。
+ * - クリーンアップ時に `timerStartedRef` をリセットして再試行できるようにする。
+ */
 export function OpeningOverlay() {
   const [phase, setPhase] = useState<Phase>(() => (checkShouldPlay() ? "enter" : "done"));
 

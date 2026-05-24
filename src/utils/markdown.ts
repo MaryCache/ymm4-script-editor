@@ -3,8 +3,19 @@ import type { Character, Line, Project } from "../types";
 import { generateId } from "./id";
 import { colorForIndex } from "./color";
 
+/**
+ * Markdown インポートの結果を表す型。
+ *
+ * @remarks
+ * `project` はパース成功した {@link Project}。
+ * `skippedLines` は「キャラ名: テキスト」形式に合わなかった行の件数
+ * （ユーザーへの通知用）。
+ *
+ * @see {@link parseMarkdown}
+ */
 export type ParseResult = { project: Project; skippedLines: number };
 
+/** フロントマターの内部表現（パース専用）。 */
 type Frontmatter = { projectName?: string; characters: { name: string; color: string }[] };
 
 const unquote = (s: string): string => s.trim().replace(/^["']|["']$/g, "");
@@ -31,6 +42,33 @@ const parseFrontmatter = (block: string): Frontmatter => {
   return result;
 };
 
+/**
+ * Markdown テキストをプロジェクトデータへパースする。
+ *
+ * @remarks
+ * フォーマット:
+ * - オプションの YAML フロントマター（`---` 区切り）でプロジェクト名とキャラクター色を定義。
+ * - 本文は `キャラ名: テキスト` の行を台本行として解釈。
+ * - `#` 始まりの見出し行・空行はスキップ（`skippedLines` にはカウントされない）。
+ * - 区切りが「コロン＋半角スペース」でない行は `skippedLines` にカウント。
+ * - フロントマターに未登録のキャラクター名が本文に現れた場合、自動生成して追加する。
+ * - 孤立した `\r`（旧 Mac 改行）も `\n` に統一する。
+ *
+ * @param raw - 読み込んだ Markdown テキスト（UTF-8 文字列）
+ * @returns パース結果 `{ project, skippedLines }`
+ *
+ * @example
+ * ```ts
+ * const md = `---\nproject: 劇場版\ncharacters:\n  - name: 春香\n    color: "#FF6B6B"\n---\n春香: こんにちは\n`;
+ * const { project, skippedLines } = parseMarkdown(md);
+ * // project.projectName === "劇場版"
+ * // project.lines[0]?.text === "こんにちは"
+ * // skippedLines === 0
+ * ```
+ *
+ * @see {@link buildMarkdown} — 逆変換（Project → Markdown）
+ * @see {@link ParseResult}
+ */
 export const parseMarkdown = (raw: string): ParseResult => {
   // 孤立した \r（旧 Mac 改行）も \n に統一する。
   let body = raw.replace(/\r\n|\r/g, "\n");
@@ -85,6 +123,20 @@ export const parseMarkdown = (raw: string): ParseResult => {
 // projectName とキャラ名の改行（\r\n / \r / \n）を半角スペースに置換してから埋め込む。
 const sanitizeLine = (s: string): string => s.replace(/\r\n|\r|\n/g, " ");
 
+/**
+ * プロジェクトデータを Markdown テキストへ変換する。
+ *
+ * @remarks
+ * YAML フロントマター（`---` 区切り）にプロジェクト名とキャラクター色を書き出し、
+ * 本文は `キャラ名: テキスト` 形式で各行を並べる。
+ * `projectName` やキャラ名に含まれる改行はスペースに置換して
+ * フロントマターの `---` 区切りが崩れるのを防ぐ。
+ *
+ * @param project - 変換対象のプロジェクト
+ * @returns Markdown テキスト文字列（末尾 `\n` 付き）
+ *
+ * @see {@link parseMarkdown} — 逆変換（Markdown → Project）
+ */
 export const buildMarkdown = (project: Project): string => {
   const head = [
     "---",

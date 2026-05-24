@@ -14,6 +14,24 @@ import styles from "./App.module.css";
 // アスキー記号 ▸ はモノスペースフォントで等幅に近いため採用。
 const MARQUEE_TEXT = "YMM4 ▸ SCRIPT ▸ EDITOR ▸ YMM4台本エディタ ▸ ";
 
+/**
+ * アプリケーションのルートコンポーネント。
+ *
+ * @remarks
+ * `useProject` フックでプロジェクト状態を管理し、
+ * `Header` / `CharacterPanel` / `ScriptEditor` へ各操作ハンドラーを配布する。
+ *
+ * レイアウト:
+ * - CSS Grid（`.app`）で `Header` / `CharacterPanel` / `ScriptEditor` を配置する。
+ * - 背景装飾レイヤー（`BgCanvas` + marquee + slow-rot リング）は `z-index: 0` で UI より背面に置く。
+ * - `OpeningOverlay` は起動時のみ全画面に重なり、フェードアウト後に DOM から消える。
+ *
+ * ハンドラー安定化:
+ * - `copyLine` は `project.characters` が変化したときのみ再生成（テキスト編集では不変）。
+ * - `onMoveUp` / `onMoveDown` は `moveLine` を `useCallback` で包んで引数変換する。
+ * - `importMarkdown` / `loadYmscript` は読み込み失敗を `alert` で通知する。
+ * - `onCopyAll` はクリップボードエラーを `alert` で通知する（要件 design §8, I-1）。
+ */
 export default function App() {
   const {
     project,

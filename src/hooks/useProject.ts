@@ -7,24 +7,140 @@ import { buildCSV, buildCSVText } from "../utils/csv";
 import { buildMarkdown, parseMarkdown } from "../utils/markdown";
 import { downloadText, parseProjectFile, readFileAsText, sanitizeFilename } from "../utils/file";
 
+/**
+ * `localStorage` のキー。プロジェクトの永続化に使用する。
+ *
+ * @remarks
+ * 名前空間プレフィックス `ymm4-script-editor:` により他アプリとの衝突を防ぐ。
+ *
+ * @see {@link useProject}
+ */
 export const STORAGE_KEY = "ymm4-script-editor:last-project";
 
+/**
+ * `useProject` フックが返すプロジェクト操作 API の型。
+ *
+ * @remarks
+ * すべてのミューテーター（`setProjectName` 〜 `moveLine`）は
+ * `useCallback(deps: [])` で安定参照を持ち、`React.memo` 化したコンポーネントに
+ * 渡しても不要な再描画を引き起こさない（要件 NF-10）。
+ *
+ * `saveToFile` / `exportCSV` / `exportMarkdown` / `exportCSVToClipboard` は
+ * `project` の現在値を直接参照するため `[project]` 依存になる。
+ *
+ * @see {@link useProject}
+ */
 export type UseProjectReturn = {
+  /** 現在のプロジェクト状態（読み取り専用参照）。 */
   project: Project;
+  /** プロジェクト名を更新する。 */
   setProjectName: (name: string) => void;
+  /**
+   * 指定名のキャラクターを末尾に追加する。
+   *
+   * @param name - 追加するキャラクター名
+   */
   addCharacter: (name: string) => void;
+  /**
+   * 指定 ID のキャラクターを削除する。
+   *
+   * @remarks
+   * 最後の1キャラクターは削除不可（孤児 Line 防止）。該当行の `characterId` は
+   * 「削除対象でない最初のキャラクター」へ付け替える（要件 F-04）。
+   *
+   * @param id - 削除対象のキャラクター ID
+   */
   deleteCharacter: (id: string) => void;          // 最後の1キャラは no-op
+  /**
+   * 指定 ID の行の直後に新しい行を挿入する。
+   *
+   * @remarks
+   * 新しい行は元の行のキャラクターを引き継ぐ（同一話者の連続入力が自然なため）。
+   * キャラクターが未登録の場合は no-op。
+   *
+   * @param afterId - 挿入基準となる行の ID
+   */
   addLineAfter: (afterId: string) => void;
+  /**
+   * プロジェクトの末尾に新しい行を追加する。
+   *
+   * @remarks
+   * 文脈がないため先頭キャラクターを割り当てる。
+   * キャラクターが未登録の場合は no-op。
+   */
   addLineAtEnd: () => void;
+  /**
+   * 指定 ID の行を削除する。
+   *
+   * @param id - 削除対象の行 ID
+   */
   deleteLine: (id: string) => void;
+  /**
+   * 指定行のキャラクターを変更する。
+   *
+   * @param lineId - 変更対象の行 ID
+   * @param characterId - 新しいキャラクター ID
+   */
   updateLineCharacter: (lineId: string, characterId: string) => void;
+  /**
+   * 指定行のテキストを更新する。
+   *
+   * @param lineId - 更新対象の行 ID
+   * @param text - 新しいテキスト
+   */
   updateLineText: (lineId: string, text: string) => void;
+  /**
+   * 指定行を上または下に1つ移動する。
+   *
+   * @remarks
+   * 先頭行を `"up"` / 末尾行を `"down"` にしても no-op（範囲外ガード）。
+   *
+   * @param id - 移動対象の行 ID
+   * @param direction - 移動方向
+   */
   moveLine: (id: string, direction: "up" | "down") => void;
+  /**
+   * プロジェクトを `.ymscript` ファイルとしてダウンロードする。
+   *
+   * @remarks
+   * ファイル名は `sanitizeFilename(project.projectName) + ".ymscript"`。
+   */
   saveToFile: () => void;                          // .ymscript
+  /**
+   * `.ymscript` ファイルを読み込んでプロジェクトを復元する。
+   *
+   * @param file - ユーザーが選択した `.ymscript` ファイル
+   * @returns 読み込み完了の Promise（失敗時は reject）
+   */
   loadFromFile: (file: File) => Promise<void>;
+  /**
+   * プロジェクトを BOM 付き CSV ファイルとしてダウンロードする。
+   *
+   * @remarks
+   * Excel / YMM4 での文字化けを防ぐため UTF-8 BOM を付与する（要件 F-51）。
+   */
   exportCSV: () => void;                           // BOM付き .csv
+  /**
+   * プロジェクトを Markdown ファイルとしてダウンロードする。
+   *
+   * @remarks
+   * YAML フロントマター付きの完全形式。`parseMarkdown` で round-trip できる。
+   */
   exportMarkdown: () => void;                       // 完全形式 .md
+  /**
+   * Markdown ファイルを読み込んでプロジェクトを更新する。
+   *
+   * @param file - ユーザーが選択した `.md` ファイル
+   * @returns スキップした行数（パースできなかった行の件数）
+   */
   importMarkdown: (file: File) => Promise<number>;  // 返り値: skippedLines
+  /**
+   * プロジェクト全行の CSV テキストをクリップボードにコピーする（要件 F-51）。
+   *
+   * @remarks
+   * BOM なしの CSV テキストをコピーする（ペースト先が BOM を扱えないケースを考慮）。
+   * Clipboard API が利用できない場合は reject する。
+   */
   exportCSVToClipboard: () => Promise<void>;        // 全件コピー（F-51）
 };
 
@@ -45,6 +161,30 @@ const restoreProjectFromStorage = (): Project => {
 
 const newLine = (characterId: string): Line => ({ id: generateId(), characterId, text: "" });
 
+/**
+ * プロジェクト全体の状態管理と永続化を提供するカスタムフック。
+ *
+ * @remarks
+ * - プロジェクト状態は `localStorage`（キー: {@link STORAGE_KEY}）に自動永続化される。
+ * - 起動時に `localStorage` から復元を試みる（壊れた値は `defaultProject` にフォールバック）。
+ * - ミューテーター（`setProjectName` 〜 `moveLine`）は `updater` 形式の `setProject` を使い、
+ *   外部依存ゼロで `useCallback([])` による安定参照を実現する（要件 NF-10）。
+ * - `saveToFile` / `exportCSV` / `exportMarkdown` / `exportCSVToClipboard` は
+ *   `project` の現在値を参照するため `[project]` 依存になる。
+ *
+ * @returns {@link UseProjectReturn} — プロジェクト状態とミューテーター一式
+ *
+ * @example
+ * ```ts
+ * function App() {
+ *   const { project, addCharacter, addLineAtEnd, exportCSV } = useProject();
+ *   return <div>{project.projectName}</div>;
+ * }
+ * ```
+ *
+ * @see {@link UseProjectReturn}
+ * @see {@link STORAGE_KEY}
+ */
 export const useProject = (): UseProjectReturn => {
   const [project, setProject] = useState<Project>(restoreProjectFromStorage);
 

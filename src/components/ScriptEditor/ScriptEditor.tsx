@@ -4,16 +4,61 @@ import type { Character, Line } from "../../types";
 import { LineRow } from "../LineRow/LineRow";
 import styles from "./ScriptEditor.module.css";
 
+/**
+ * `ScriptEditor` コンポーネントの props 型。
+ *
+ * @see {@link ScriptEditor}
+ */
 export type ScriptEditorProps = {
+  /** 台本に登録されているキャラクター一覧。 */
   characters: Character[];
+  /** 台本の行（セリフ）一覧。 */
   lines: Line[];
+  /** 末尾に行を追加するコールバック。 */
   onAddLine: () => void;
+  /**
+   * 行のキャラクターを変更するコールバック。
+   *
+   * @param lineId - 変更対象の行 ID
+   * @param characterId - 新しいキャラクター ID
+   */
   onCharacterChange: (lineId: string, characterId: string) => void;
+  /**
+   * 行のテキストを更新するコールバック。
+   *
+   * @param lineId - 更新対象の行 ID
+   * @param text - 新しいテキスト
+   */
   onTextChange: (lineId: string, text: string) => void;
+  /**
+   * 行を上に移動するコールバック。
+   *
+   * @param lineId - 移動対象の行 ID
+   */
   onMoveUp: (lineId: string) => void;
+  /**
+   * 行を下に移動するコールバック。
+   *
+   * @param lineId - 移動対象の行 ID
+   */
   onMoveDown: (lineId: string) => void;
+  /**
+   * 直後に行を挿入するコールバック。
+   *
+   * @param lineId - 基準となる行 ID
+   */
   onAddAfter: (lineId: string) => void;
+  /**
+   * 行を削除するコールバック。
+   *
+   * @param lineId - 削除対象の行 ID
+   */
   onDelete: (lineId: string) => void;
+  /**
+   * 行をコピーするコールバック。
+   *
+   * @param line - コピー対象の行データ
+   */
   onCopy: (line: Line) => void;
 };
 
@@ -231,6 +276,30 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
   return { canScrollDown, canScrollUp, showScrollToTop, recheckScroll: check };
 }
 
+/**
+ * 台本のセリフ一覧を表示・編集するメインエディターコンポーネント。
+ *
+ * @remarks
+ * 以下の機能を統合する:
+ *
+ * - FLIP アニメーション（`useFLIP`）: 行の並べ替え・追加・削除時に
+ *   `useLayoutEffect` ベースの First-Last-Invert-Play で滑らかな移動アニメを提供する。
+ *   テキスト入力時は `signature`（行順序＋件数の文字列）が変化しないため走らない（要件 NF-10）。
+ *
+ * - スクロールインジケーター（`useScrollIndicator`）: スクロール可能方向を矢印で視覚化する。
+ *   `ResizeObserver` + `scroll` イベントで動的に更新する。
+ *
+ * - 一番上に戻るボタン: スクロール量が `clientHeight` を超えたときに表示する。
+ *   `prefers-reduced-motion` 時は即時スクロール（`behavior: "auto"`）を使う。
+ *
+ * - 合計文字数・行数をヘッダーに表示する。
+ *
+ * アクセシビリティ:
+ * - `<section aria-label="台本エディター">` で landmark として識別可能にする。
+ * - 一番上に戻るボタンは非表示時 `tabIndex={-1}` + `aria-hidden` でフォーカス・SR 読み上げを防ぐ。
+ *
+ * @param props - {@link ScriptEditorProps}
+ */
 export function ScriptEditor(props: ScriptEditorProps) {
   const total = props.lines.reduce((sum, l) => sum + l.text.length, 0);
   // キャラが0人のとき行追加を無効化（選択肢がないため。ScriptEditor 側でも UI 制約を明示）。

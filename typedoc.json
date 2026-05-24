@@ -1,0 +1,11 @@
+{
+  "entryPoints": ["src/types.ts", "src/main.tsx", "src/App.tsx", "src/hooks/useProject.ts", "src/utils/id.ts", "src/utils/color.ts", "src/utils/csv.ts", "src/utils/markdown.ts", "src/utils/file.ts", "src/components/BgCanvas/BgCanvas.tsx", "src/components/CharacterPanel/CharacterPanel.tsx", "src/components/Header/Header.tsx", "src/components/LineRow/LineRow.tsx", "src/components/OpeningOverlay/OpeningOverlay.tsx", "src/components/ScriptEditor/ScriptEditor.tsx"],
+  "entryPointStrategy": "resolve",
+  "tsconfig": "./tsconfig.app.json",
+  "out": "docs/api",
+  "exclude": ["**/*.test.*", "**/*.test.ts", "**/*.test.tsx", "src/test/**", "src/perf/**"],
+  "skipErrorChecking": false,
+  "name": "YMM4 Script Editor",
+  "includeVersion": true,
+  "readme": "none"
+}

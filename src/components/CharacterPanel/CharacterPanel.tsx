@@ -3,12 +3,44 @@ import { useState, useCallback, type ChangeEvent } from "react";
 import type { Character } from "../../types";
 import styles from "./CharacterPanel.module.css";
 
+/**
+ * `CharacterPanel` コンポーネントの props 型。
+ *
+ * @see {@link CharacterPanel}
+ */
 export type CharacterPanelProps = {
+  /** 現在登録されているキャラクター一覧。 */
   characters: Character[];
+  /**
+   * キャラクター追加要求のコールバック。
+   *
+   * @param name - 追加するキャラクター名（trim 済みの空文字は呼ばれない）
+   */
   onAdd: (name: string) => void;
+  /**
+   * キャラクター削除要求のコールバック。
+   *
+   * @remarks
+   * 最後の1キャラクターは `disabled` 状態のため呼ばれないが、
+   * `useProject.deleteCharacter` 側でも no-op ガードを持つ（二重防衛）。
+   *
+   * @param id - 削除対象のキャラクター ID
+   */
   onDelete: (id: string) => void;
 };
 
+/**
+ * キャラクター一覧の表示・追加・削除を担うサイドパネルコンポーネント。
+ *
+ * @remarks
+ * - キャラクター名入力フォームと一覧リストを持つ。
+ * - 最後の1キャラクターは削除ボタンが `disabled` になる（孤児 Line 防止）。
+ * - 削除時は CSS アニメーション（退場スライド）を再生してから `onDelete` を呼ぶ。
+ * - `prefers-reduced-motion: reduce` 時は即時削除（アニメーションスキップ）。
+ * - フッターは装飾専用（`aria-hidden`）でスクリーンリーダーには読まれない。
+ *
+ * @param props - {@link CharacterPanelProps}
+ */
 export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelProps) {
   const [name, setName] = useState("");
   // 最後の1キャラは削除不可（孤児 Line 防止。useProject.deleteCharacter と同じ制約を UI でも保証）。
