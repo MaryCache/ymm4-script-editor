@@ -286,3 +286,28 @@
   .menuPanel { animation: none; }
   .menuItem  { animation: none; }
 }
+
+/* ===== Window Controls Overlay（PWA: ネイティブウィンドウ風）=====
+ * manifest の display_override: "window-controls-overlay" でインストールされた時のみ有効。
+ * ヘッダーを「アプリ自前のタイトルバー」にする:
+ *   - ヘッダー全域をドラッグ可能領域にしてウィンドウを掴んで動かせる
+ *   - OS のウィンドウコントロール(右上の 最小/最大/閉じる)に被らないよう右側に余白を確保
+ *   - ボタン/入力/メニューはドラッグ対象から外し、通常どおり操作可能にする
+ * タブ表示(display-mode: browser)や未対応環境ではこのブロックは適用されない。 */
+@media (display-mode: window-controls-overlay) {
+  .header {
+    -webkit-app-region: drag;
+    app-region: drag;
+    /* OS コントロール帯の幅 = 100% - titlebar-area-width - titlebar-area-x。
+     * その分を右パディングに足し、ヘッダー右端のアクション群がコントロールと重ならないようにする。 */
+    padding-right: calc(100% - env(titlebar-area-width, 100%) - env(titlebar-area-x, 0px) + 12px);
+  }
+  /* インタラクティブ要素はドラッグ対象から除外（クリック/入力/メニューを通常動作に） */
+  .header button,
+  .header input,
+  .header summary,
+  .menuPanel {
+    -webkit-app-region: no-drag;
+    app-region: no-drag;
+  }
+}
