@@ -23,24 +23,10 @@ const MARQUEE_TEXT = "YMM4 ▸ SCRIPT ▸ EDITOR ▸ YMM4台本エディタ ▸ 
  * アプリケーションのルートコンポーネント。
  *
  * @remarks
- * `useProject` フックでプロジェクト状態を管理し、
- * `Header` / `CharacterPanel` / `ScriptEditor` へ各操作ハンドラーを配布する。
- *
- * レイアウト:
- * - CSS Grid（`.app`）で `Header` / `CharacterPanel` / `ScriptEditor` を配置する。
- * - 背景装飾レイヤー（`BgCanvas` + marquee + slow-rot リング）は `z-index: 0` で UI より背面に置く。
- * - `OpeningOverlay` は起動時のみ全画面に重なり、フェードアウト後に DOM から消える。
- *
- * ハンドラー安定化:
- * - `copyLine` は `project.characters` が変化したときのみ再生成（テキスト編集では不変）。
- * - `onMoveUp` / `onMoveDown` は `moveLine` を `useCallback` で包んで引数変換する。
- * - `importMarkdown` / `loadYmscript` は読み込み失敗をトースト通知する。
- * - `onCopyAll` はクリップボードエラーをトースト通知する（要件 design §8, I-1）。
- *
- * トースト通知:
- * - `toasts` state でトーストエントリ一覧を管理する（App ローカル state）。
- * - `pushToast` で追加、`dismissToast` で id 指定削除。
- * - `ToastViewport` が body 直下 (createPortal) に描画する。
+ * `useProject` がプロジェクト状態を一元管理し、各子コンポーネントへハンドラーを配布する。
+ * この構造にした理由: 状態を App に集約することで子コンポーネントを純粋な表示層に保ち、
+ * 型レベルで「誰が何を変更できるか」を `useProject` の返す型で表明できる。
+ * トースト通知も App が集中管理することで、複数コンポーネントからの通知を1箇所でまとめる。
  */
 export default function App() {
   // ===== トースト通知 =====
@@ -191,7 +177,6 @@ export default function App() {
 
   // copyLine は characters が変わった時のみ再生成。テキスト編集では characters 参照は不変なので、
   // 毎打鍵で LineRow が再描画されることはない（NF-10 維持）。
-  // charsRef.current = ... をレンダー中に書く旧実装は react-hooks/refs 違反のため廃止（C-1）。
   const copyLine = useCallback(
     (line: Line) => {
       navigator.clipboard.writeText(buildLineCSV(line, project.characters)).catch((e) => {

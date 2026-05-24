@@ -16,6 +16,9 @@ export type PasteImportModalProps = {
   /**
    * 取り込みボタン押下のコールバック。空文字・空白のみの場合は呼ばれない。
    *
+   * @remarks
+   * 取り込み完了後の行数トースト通知は呼び出し元（App）の責務。
+   *
    * @param text - textarea に入力されたテキスト
    */
   onImport: (text: string) => void;
@@ -25,12 +28,11 @@ export type PasteImportModalProps = {
  * プレーンテキストをコピペでインポートするモーダルコンポーネント。
  *
  * @remarks
- * - `Modal` 基盤を使用する（role="dialog"、backdrop-fade + modal-rise-in アニメーション、
- *   フォーカストラップ、Esc 閉じ、オーバーレイクリック閉じ、フォーカス復帰）。
- * - textarea に `initialFocus` を向けてオートフォーカスする。
- * - 「取り込み」押下時: テキストが空または空白のみなら何もせず閉じる。
- *   それ以外は `onImport(text)` を呼んでから閉じる。
- * - モーダルを閉じると textarea の内容をリセットする。
+ * `Modal` 基盤を使用する（挙動は {@link Modal} 参照）。
+ * textarea に `initialFocus` を向けてオートフォーカスする。
+ * 「取り込み」押下時: テキストが空または空白のみなら何もせず閉じる。
+ * それ以外は `onImport(text)` を呼んでから閉じる。
+ * open=false で Modal が内側 DOM ごと unmount するため、textarea の手動リセットは不要。
  *
  * @param props - {@link PasteImportModalProps}
  */
@@ -51,13 +53,10 @@ export function PasteImportModal({ open, onClose, onImport }: PasteImportModalPr
     }
     onImport(text);
     onClose();
-    // textarea の手動リセット不要: Modal は open=false で内側の DOM ごと unmount するため、
-    // 次回 open 時は新鮮な textarea が再マウントされる。
   }, [onImport, onClose]);
 
   const handleClose = useCallback(() => {
     onClose();
-    // textarea の手動リセット不要: open=false で DOM ごと破棄されるためリセット不要。
   }, [onClose]);
 
   return (
@@ -69,7 +68,6 @@ export function PasteImportModal({ open, onClose, onImport }: PasteImportModalPr
         <p id={descId} className={styles.desc}>
           改行ごとに1行・すべて先頭キャラクターに割り当てて末尾に追加します
         </p>
-        {/* 非制御テキストエリア: ref で値を読む。open=false で DOM ごと unmount されるため手動リセット不要。 */}
         <textarea ref={textareaRef} className={styles.textarea} aria-label="インポートするテキスト" rows={10} />
         <div className={styles.actions}>
           <button className={styles.btnCancel} onClick={handleClose}>

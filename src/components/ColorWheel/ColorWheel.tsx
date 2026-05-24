@@ -88,7 +88,7 @@ const angleFromCenter = (cx: number, cy: number): number => {
 export function ColorWheel({ color, onChange, onClose }: ColorWheelProps) {
   // useId: 同一ページに複数の ColorWheel が同時に描画されても id が衝突しないよう
   // React が生成するコンポーネント固有の id を使用する。
-  // ピッカーエリアの aria-labelledby 等、将来の a11y 拡張の基点として保持する。
+  // 現状は container div の id 属性にのみ付与し、aria-labelledby への接続は未実施。
   const uid = useId();
   const pickerId = `color-picker-${uid}`;
 

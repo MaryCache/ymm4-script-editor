@@ -146,15 +146,10 @@ export const PALETTE = [
  * ```ts
  * colorForIndex(0);  // => "#FF6B6B"
  * colorForIndex(10); // => "#FF6B6B" (wrap-around)
- * colorForIndex(-1); // => "#B388EB" (last color)
+ * colorForIndex(-1); // => "#B388EB"
  * ```
  *
  * @see {@link PALETTE}
  */
-// index を 0..length-1 に正規化（負数・範囲外でも undefined を返さない）。
-// 戻り値型を (typeof PALETTE)[number] にすることで、呼び出し側がリテラル union の
-// 補完を受けられる（意図が型に出る）。
-// 注意: フロントマターで手動指定された色とは衝突回避を保証しない（自動付与は
-// 出現順の巡回のみ。手動色が偶然パレット内の色と一致すると同色になりうる）。
 export const colorForIndex = (index: number): (typeof PALETTE)[number] =>
   PALETTE[((index % PALETTE.length) + PALETTE.length) % PALETTE.length]!;

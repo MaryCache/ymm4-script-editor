@@ -40,11 +40,9 @@ export type ConfirmDialogProps = {
  * 汎用確認ダイアログコンポーネント。
  *
  * @remarks
- * - `Modal` 基盤を使用する（role="alertdialog"、backdrop-fade + modal-rise-in アニメーション、
- *   フォーカストラップ、Esc 閉じ、オーバーレイクリック閉じ、フォーカス復帰）。
- * - 破壊操作の誤操作防止のため、**既定フォーカスはキャンセルボタン**（`initialFocus`）。
- * - `danger=true` のとき確認ボタンを danger 配色にする。
- * - 確認で `onConfirm()` を呼んでから閉じる。Esc / キャンセル / オーバーレイで `onClose()`。
+ * `Modal` 基盤を使用する（挙動は {@link Modal} 参照）。
+ * 破壊操作の誤操作防止のため既定フォーカスはキャンセルボタン（`initialFocus`）。
+ * `titleId` / `descId` は `useId` で内部生成し `Modal` へ渡す（外部から指定不要）。
  *
  * @param props - {@link ConfirmDialogProps}
  */

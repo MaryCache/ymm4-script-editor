@@ -61,6 +61,32 @@ export type Project = {
 };
 
 /**
+ * タブ UI に表示するためのエントリ型。{@link Workspace} の表示投影。
+ *
+ * @remarks
+ * `isEmpty` は `lines.length === 0 && characters.length === 0` の導出値。
+ * 行が0件**かつ**キャラ未追加のときのみ空と見なす（F-113）。
+ * `true` のとき × 閉じは確認なしで即実行。
+ * `false` のとき呼び出し元（App）で ConfirmDialog を開く。
+ *
+ * @see {@link useProject} — `tabs` フィールドで `TabEntry[]` を返す
+ * @see {@link Workspace}
+ */
+export type TabEntry = {
+  /** エントリの一意 ID（{@link Workspace.activeId} と同じ名前空間）。 */
+  id: string;
+  /** プロジェクト名（タブに表示する）。 */
+  name: string;
+  /**
+   * 台本が空（行が0件かつキャラ未追加）かどうか。
+   *
+   * @remarks
+   * 行が0件でもキャラが1人以上いる場合は `false`（閉じ時に確認が必要）。
+   */
+  isEmpty: boolean;
+};
+
+/**
  * ワークスペース内の1タブに対応するエントリ。
  *
  * @remarks

@@ -1,28 +1,10 @@
 // src/components/ProjectTabs/ProjectTabs.tsx
 import { useState, useCallback, useRef, type KeyboardEvent } from "react";
+import type { TabEntry } from "../../types";
 import styles from "./ProjectTabs.module.css";
 
-/**
- * タブエントリの型。
- *
- * @remarks
- * `isEmpty` は `lines.length === 0` の導出値。
- * 閉じる前に中身があるかどうかを UI 側で判断するために使用する（F-113）。
- */
-export type TabEntry = {
-  /** エントリの一意 ID。 */
-  id: string;
-  /** プロジェクト名（タブに表示する）。 */
-  name: string;
-  /**
-   * 台本が空（行が0件）かどうか。
-   *
-   * @remarks
-   * `true` のとき × 閉じは確認なしで即実行。
-   * `false` のとき App 側で ConfirmDialog を開く（F-113）。
-   */
-  isEmpty: boolean;
-};
+// TabEntry は types.ts で定義。後方互換のため index.ts から re-export 継続。
+export type { TabEntry };
 
 /**
  * `ProjectTabs` コンポーネントの props 型。
@@ -74,7 +56,7 @@ export type ProjectTabsProps = {
  * - タブが多い場合は横スクロール可能（F-115）。
  * - アクティブタブが見えるよう `scrollIntoView` を呼ぶ。
  * - 矢印キーでタブ間を移動する（ARIA tablist keyboard a11y）。
- * - `prefers-reduced-motion: reduce` でアニメーションを簡素化（§7.1）。
+ * - `prefers-reduced-motion: reduce` でアニメーションを簡素化（F-115）。
  *
  * @param props - {@link ProjectTabsProps}
  */

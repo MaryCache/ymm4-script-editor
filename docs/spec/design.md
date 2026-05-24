@@ -123,7 +123,7 @@ type UseProjectReturn = {
 ### 3.2 localStorage 自動保存
 
 - `useProject` 内で `useEffect` を使い、`project` が変化するたびに localStorage に書き込む
-- キー: `ymm4-script-editor:last-project`
+- キー: `ymm4-script-editor:last-project`（**→ v1.3 で `ymm4-script-editor:workspace` に移行。旧キーはマイグレーション用に参照継続。§10.y 参照**）
 - 初期化時: localStorage に値があれば読み込む、なければデフォルト値を使う
 
 ```typescript
@@ -457,3 +457,28 @@ Header は `@media (display-mode: window-controls-overlay)` で `app-region:drag
   - Markdown のフロントマターで **色を明示**した場合はそれを優先。未指定／簡易形式は出現順で自動付与。
 - 既知の割り切り: 手動指定色とパレット自動色の**衝突は回避しない**（偶然同色になりうる）。識別が主目的のため許容。
 - 各行・各キャラの色は表示時に CSS 変数 `--char`（= `character.color`）として注入し、左アクセントバー・選択ドット・フォーカス色に用いる。
+
+### 10.11 v1.2 追補 — Modal 基盤・ColorWheel・各コンポーネント
+
+> spec-v1.2-paste-and-character-edit.md の実装で追加された設計骨子。
+
+- **Modal 基盤**: 共通オーバーレイ + フォーカストラップ + Esc クローズ + backdrop-fade / modal-rise-in アニメ。`PasteImportModal` と `ConfirmDialog` が再利用。
+- **ColorWheel**（依存ゼロ）: 内部 state は **HSV `{h, s, v}`**。UI は**色相リング（conic-gradient）+ SV スクエア（彩度・明度2次元パネル）+ hex 入力欄**。変換は `hexToHsv` / `hsvToHex`。出力形式 `#RRGGBB`。ポップオーバーは dropdown-enter-right アニメで開閉。
+- **PasteImportModal**: `role="dialog"` / `aria-modal` / フォーカストラップ。`importPlainText(text)` を呼び取り込み行数を Toast 通知。
+- **ConfirmDialog**: `role="alertdialog"` / 既定フォーカスはキャンセルボタン / 破壊操作色（`--danger`）のリセットボタン。
+- **Toast**: 簡易通知コンポーネント（取り込み成功等の一時メッセージ）。
+- `useProject` 追加 mutator: `renameCharacter` / `setCharacterColor` / `importPlainText` / `clearAllLines`。いずれも useCallback 安定参照。
+
+### 10.12 v1.3 追補 — Workspace / ProjectTabs / ストレージ移行
+
+> spec-v1.3-multi-project-tabs.md の実装で追加された設計骨子。
+
+- **型追加**（`src/types.ts`）:
+  ```typescript
+  type WorkspaceEntry = { id: string; project: Project; };
+  type Workspace = { version: 1; activeId: string; entries: WorkspaceEntry[]; };
+  ```
+- **useProject のワークスペース化**: 公開 API 名は `useProject` のまま（`useWorkspace` へ改名しない）。内部で `Workspace` を state として保持し、既存 mutator はすべてアクティブ entry の `project` に作用。新規公開: `tabs: {id, name}[]` / `activeId` / `newProject()` / `switchProject(id)` / `closeProject(id)`。
+- **ProjectTabs** コンポーネント（新規）: `role="tablist"` のタブストリップ。編集領域の `role="tabpanel"` コンテナは App 側に配置。アニメ: 追加=appear-slide / 閉じる=フェード / 下線移動=スライド。
+- **ストレージキー移行**: 主キー `ymm4-script-editor:workspace`（Workspace JSON）。旧キー `ymm4-script-editor:last-project`（単体 Project）は起動時マイグレーション用に参照継続し、workspace キーが正となった後も削除しない。
+- **マイグレーションロジック**: 起動時 ①workspace キーあり→採用、②なし→旧キー確認し1エントリのワークスペースに変換、③どちらもなし→既定の空プロジェクト1件。

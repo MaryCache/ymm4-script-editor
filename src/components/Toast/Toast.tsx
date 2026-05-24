@@ -47,12 +47,11 @@ const AUTO_DISMISS_ERROR = 5000;
  * 単一トーストアイテムコンポーネント。
  *
  * @remarks
- * - 入場アニメーション（スライド＋フェード）と退場アニメーション（フェードアウト）を持つ。
- * - `prefers-reduced-motion: reduce` ではアニメーションを無効化する（CSS で制御）。
- * - マウント後に自動消滅タイマーを開始し、unmount 時にクリアする。
- * - × ボタンで即時 dismiss。
+ * 入場アニメーション（スライド＋フェード）と退場アニメーション（フェードアウト）を持つ。
+ * `prefers-reduced-motion: reduce` ではアニメーションを無効化する（CSS で制御）。
+ * マウント後に自動消滅タイマーを開始し、unmount 時にクリアする。
  *
- * @param props - id / message / variant / onDismiss
+ * @param props - {@link ToastEntry} + `onDismiss`
  */
 function ToastItem({ id, message, variant, onDismiss }: ToastEntry & { onDismiss: (id: string) => void }) {
   const delay = variant === "error" ? AUTO_DISMISS_ERROR : AUTO_DISMISS_INFO;

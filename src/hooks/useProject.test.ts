@@ -70,6 +70,36 @@ test("addLineAfter は指定行の直後に挿入", () => {
   expect(result.current.project.lines).toHaveLength(2);
 });
 
+// ===== isEmpty（F-113）=====
+
+test("新規タブは行もキャラもないため isEmpty=true", () => {
+  const { result } = renderHook(() => useProject());
+  expect(result.current.tabs[0]!.isEmpty).toBe(true);
+});
+
+test("キャラだけ追加して行が0件のタブは isEmpty=false（閉じ時に確認が必要）", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  expect(result.current.project.lines).toHaveLength(0);
+  expect(result.current.tabs[0]!.isEmpty).toBe(false);
+});
+
+test("行を追加したタブは isEmpty=false", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  expect(result.current.tabs[0]!.isEmpty).toBe(false);
+});
+
+test("全行削除してもキャラが残っていれば isEmpty=false", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.clearAllLines());
+  expect(result.current.project.lines).toHaveLength(0);
+  expect(result.current.tabs[0]!.isEmpty).toBe(false);
+});
+
 // ===== 永続化（ワークスペース化後の挙動）=====
 
 test("変更が localStorage（workspaceキー）に自動保存される", () => {

@@ -1,6 +1,6 @@
 // src/hooks/useProject.ts
 import { useCallback, useEffect, useRef, useState } from "react";
-import type { Line, Project, Workspace } from "../types";
+import type { Line, Project, TabEntry, Workspace } from "../types";
 import { generateId } from "../utils/id";
 import { colorForIndex } from "../utils/color";
 import { buildCSV, buildCSVText } from "../utils/csv";
@@ -52,10 +52,11 @@ export type UseProjectReturn = {
    * タブ表示用の一覧。name = project.projectName。
    *
    * @remarks
-   * `isEmpty` は `project.lines.length === 0` の導出値。
-   * 閉じる前に中身があるかどうかを UI 側で判断するために提供する（F-113）。
+   * `isEmpty` の意味・条件は {@link TabEntry} 参照。
+   *
+   * @see {@link TabEntry}
    */
-  tabs: { id: string; name: string; isEmpty: boolean }[];
+  tabs: TabEntry[];
   /** 現在アクティブなエントリの id。 */
   activeId: string;
   /** プロジェクト名を更新する。 */
@@ -382,19 +383,21 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
   const activeEntry = workspace.entries.find((e) => e.id === workspace.activeId)!;
   const project = activeEntry.project;
 
-  // tabs: 表示用（id + name + isEmpty）。isEmpty は lines.length === 0 の導出値。
+  // tabs: 表示用（TabEntry 型）。
+  // isEmpty = lines が0件かつ characters が空のときのみ真（F-113）。
+  //   行なし・キャラあり → 未保存データとみなして閉じ時に確認を要求する。
   // useMemo 不要: レンダー毎の計算コストは配列マップのみで軽量。
-  const tabs = workspace.entries.map((e) => ({
+  const tabs: TabEntry[] = workspace.entries.map((e) => ({
     id: e.id,
     name: e.project.projectName,
-    isEmpty: e.project.lines.length === 0,
+    isEmpty: e.project.lines.length === 0 && e.project.characters.length === 0,
   }));
   const { activeId } = workspace;
 
-  // --- mutator はすべて setWorkspace の updater 形式 → 外部依存ゼロ → useCallback([]) で安定参照 ---
-  // updater 形式を使う理由: 連続 act() で状態をバッチ更新しても常に最新の w を参照できる。
-  // useCallback([]) で参照を固定する理由: LineRow を React.memo 化した際、ハンドラが毎レンダ
-  // で再生成されると memo の恩恵がなくなる（NF-10 性能要件）。
+  // --- mutator はすべて setWorkspace の updater 形式で実装する ---
+  // updater 形式の理由: 連続 act() で状態をバッチ更新しても常に最新の w を参照できる。
+  // useCallback(deps: []) の理由: LineRow を React.memo 化した際、ハンドラが毎レンダで
+  // 再生成されると memo の恩恵がなくなる（NF-10 性能要件）。外部依存ゼロ = 参照が安定する。
 
   const setProjectName = useCallback(
     (name: string) => setWorkspace((w) => updateActiveProject(w, (p) => ({ ...p, projectName: name }))),
@@ -546,7 +549,8 @@ export const useProject = (options?: UseProjectOptions): UseProjectReturn => {
   // text を改行で分割 → trim → 空行スキップ。
   // 0行（全部空行）なら状態変更なし・キャラ自動作成もせず 0 を返す。
   // 0人時は「キャラ1」を自動作成し、characters と lines を1回の setWorkspace で更新する。
-  // 返り値は updater の外で算出（updater は値を返せないため）。
+  // 返り値（件数）は updater の外で算出する理由: setWorkspace の updater 形式では関数の
+  // 戻り値が次の state として解釈されるため、行数のような副作用の値をそこから返せない。
   const importPlainText = useCallback((text: string): number => {
     const parsed = text
       .split(/\r\n|\r|\n/)
