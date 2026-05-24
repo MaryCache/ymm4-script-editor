@@ -106,6 +106,32 @@
   gap: 2px;
 }
 
+/* ===== 全行リセット退場アニメーション (§4.7) =====
+ * isResetting=true の間このクラスを付与し、行リスト全体を一括フェードアウト。
+ * 220ms でフェード後 clearAllLines() が呼ばれる（App 側で 230ms タイマー）。
+ * prefers-reduced-motion: reduce では即時クリアのためこのクラスは使われない。
+ */
+.linesResetting {
+  animation: linesResetFadeOut 0.22s ease-out forwards;
+}
+
+@keyframes linesResetFadeOut {
+  from {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .linesResetting {
+    animation: none;
+  }
+}
+
 /* ===== Add row button (item 2: 二重 + 修正) =====
  * aria-label="+ 行を追加"（テストのアクセシブル名を維持）
  * 可視テキストは「行を追加」。装飾 .plus（aria-hidden）が「+」を見せる。

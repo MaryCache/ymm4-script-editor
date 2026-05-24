@@ -44,6 +44,22 @@ export type HeaderProps = {
   onLoadMarkdown: (file: File) => void;
   /** 全件コピーのコールバック（要件 F-51）。 */
   onCopyAll: () => void;
+  /** 「コピペでインポート」ボタン押下で PasteImportModal を開くコールバック（要件 F-70）。 */
+  onOpenPasteImport: () => void;
+  /**
+   * 「全行リセット」ボタン押下で確認モーダルを開くコールバック（要件 F-100）。
+   *
+   * @remarks
+   * `canResetAll=false` のときボタンは disabled になり、このコールバックは呼ばれない。
+   */
+  onOpenResetAll: () => void;
+  /**
+   * 全行リセットボタンの有効フラグ。行が1行以上ある時のみ有効（要件 F-104）。
+   *
+   * @remarks
+   * `false` のとき「全行リセット」ボタンを disabled にする。
+   */
+  canResetAll: boolean;
 };
 
 // openMenu の型: 保存/読込 の排他制御に使う（item 5）。
@@ -96,6 +112,9 @@ export function Header(props: HeaderProps) {
     onLoadYmscript,
     onLoadMarkdown,
     onCopyAll,
+    onOpenPasteImport,
+    onOpenResetAll,
+    canResetAll,
     projectName,
   } = props;
 
@@ -231,6 +250,29 @@ export function Header(props: HeaderProps) {
             ⧉
           </span>
           全件コピー
+        </button>
+
+        {/* ===== コピペでインポートボタン (F-70: 独立ボタン) =====
+         * 全件コピーの隣に配置。クリックで PasteImportModal を開く。
+         */}
+        <button className={styles.btnPasteImport} onClick={onOpenPasteImport}>
+          コピペでインポート
+        </button>
+
+        <div className={styles.vSep} aria-hidden="true" />
+
+        {/* ===== 全行リセットボタン (F-100, F-104) =====
+         * 控えめな見た目（薄いグレー系）＋ hover で danger 系に変化。
+         * 0行の時は disabled（canResetAll=false）。
+         * クリックで ConfirmDialog を開く。
+         */}
+        <button
+          className={styles.btnResetAll}
+          onClick={onOpenResetAll}
+          disabled={!canResetAll}
+          aria-label="全行リセット"
+        >
+          全行リセット
         </button>
 
         <div className={styles.vSep} aria-hidden="true" />

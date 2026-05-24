@@ -100,6 +100,45 @@ export type UseProjectReturn = {
    */
   moveLine: (id: string, direction: "up" | "down") => void;
   /**
+   * 指定 ID のキャラクター名を変更する。
+   *
+   * @remarks
+   * `name.trim()` が空文字列の場合は no-op（元の名前を維持）。
+   * trim した名前を採用するため、前後の空白は除去される。
+   *
+   * @param id - 変更対象のキャラクター ID
+   * @param name - 新しいキャラクター名
+   */
+  renameCharacter: (id: string, name: string) => void;
+  /**
+   * 指定 ID のキャラクターの色を変更する。
+   *
+   * @param id - 変更対象のキャラクター ID
+   * @param color - 新しい CSS hex カラー（例: `"#FF6B6B"`）
+   */
+  setCharacterColor: (id: string, color: string) => void;
+  /**
+   * プレーンテキストを改行で分割して台本末尾に一括追加する。
+   *
+   * @remarks
+   * 各行を trim し、空行はスキップする（要件 F-75）。
+   * 取り込んだ行のキャラクターはすべて `characters[0]` に割り当てる（要件 F-73）。
+   * キャラクターが0人のときは「キャラ1」を自動作成してから取り込む（要件 F-76）。
+   * 取り込みは既存台本の末尾に追加する（置換しない。要件 F-74）。
+   * 0行（全部空行）の場合は状態を変更せず 0 を返す（キャラ自動作成もしない）。
+   *
+   * @param text - 取り込むプレーンテキスト
+   * @returns 取り込んだ（空行除外後の）行数
+   */
+  importPlainText: (text: string) => number;
+  /**
+   * 全セリフ行を削除する。
+   *
+   * @remarks
+   * キャラクター一覧・プロジェクト名は保持される（要件 F-103）。
+   */
+  clearAllLines: () => void;
+  /**
    * プロジェクトを `.ymscript` ファイルとしてダウンロードする。
    *
    * @remarks
@@ -299,6 +338,66 @@ export const useProject = (): UseProjectReturn => {
     [],
   );
 
+  // --- v1.2 追加 mutator ---
+
+  // name.trim() が空なら no-op（元の名前を維持）。trim した名前を採用する。
+  const renameCharacter = useCallback(
+    (id: string, name: string) =>
+      setProject((p) => {
+        const trimmed = name.trim();
+        if (!trimmed) return p; // 空文字は no-op
+        return {
+          ...p,
+          characters: p.characters.map((c) => (c.id === id ? { ...c, name: trimmed } : c)),
+        };
+      }),
+    [],
+  );
+
+  const setCharacterColor = useCallback(
+    (id: string, color: string) =>
+      setProject((p) => ({
+        ...p,
+        characters: p.characters.map((c) => (c.id === id ? { ...c, color } : c)),
+      })),
+    [],
+  );
+
+  // text を改行で分割 → trim → 空行スキップ。
+  // 0行（全部空行）なら状態変更なし・キャラ自動作成もせず 0 を返す。
+  // 0人時は「キャラ1」を自動作成し、characters と lines を1回の setProject で更新する。
+  // 返り値は updater の外で算出（updater は値を返せないため）。
+  const importPlainText = useCallback((text: string): number => {
+    const parsed = text
+      .split(/\r\n|\r|\n/)
+      .map((l) => l.trim())
+      .filter((l) => l.length > 0);
+
+    if (parsed.length === 0) return 0;
+
+    setProject((p) => {
+      let characters = p.characters;
+      let characterId: string;
+
+      if (characters.length === 0) {
+        // キャラが0人なら「キャラ1」を自動作成する。
+        const newChar = { id: generateId(), name: "キャラ1", color: colorForIndex(0) };
+        characters = [newChar];
+        characterId = newChar.id;
+      } else {
+        // noUncheckedIndexedAccess のため非 null アサーション: length > 0 を確認済み。
+        characterId = characters[0]!.id;
+      }
+
+      const newLines = parsed.map((lineText) => ({ id: generateId(), characterId, text: lineText }));
+      return { ...p, characters, lines: [...p.lines, ...newLines] };
+    });
+
+    return parsed.length;
+  }, []);
+
+  const clearAllLines = useCallback(() => setProject((p) => ({ ...p, lines: [] })), []);
+
   // --- [project] 依存: saveToFile / exportCSV / exportMarkdown / exportCSVToClipboard ---
   // これらは project の現在値を関数実行時に読むため、updater 形式が使えず [project] 依存。
   // Header など1コンポーネントにのみ渡るため、project 変化ごとの再生成コストは無視可。
@@ -349,6 +448,10 @@ export const useProject = (): UseProjectReturn => {
     updateLineCharacter,
     updateLineText,
     moveLine,
+    renameCharacter,
+    setCharacterColor,
+    importPlainText,
+    clearAllLines,
     saveToFile,
     loadFromFile,
     exportCSV,

@@ -60,6 +60,17 @@ export type ScriptEditorProps = {
    * @param line - コピー対象の行データ
    */
   onCopy: (line: Line) => void;
+  /**
+   * 全行リセットのフェードアウト中フラグ。
+   *
+   * @remarks
+   * `true` の間、行リスト（`.lines`）に fadeout クラスを付与して
+   * opacity → 0 のアニメーションを再生する。
+   * `prefers-reduced-motion: reduce` 時は即時クリアのためこのフラグは使われない。
+   *
+   * @defaultValue `false`
+   */
+  isResetting?: boolean;
 };
 
 // ===== FLIP アニメーション (item 3) =====
@@ -303,6 +314,7 @@ function useScrollIndicator(linesRef: React.RefObject<HTMLDivElement | null>) {
  * @param props - {@link ScriptEditorProps}
  */
 export function ScriptEditor(props: ScriptEditorProps) {
+  const { isResetting = false } = props;
   const total = props.lines.reduce((sum, l) => sum + l.text.length, 0);
   // キャラが0人のとき行追加を無効化（選択肢がないため。ScriptEditor 側でも UI 制約を明示）。
   const canAdd = props.characters.length > 0;
@@ -371,7 +383,7 @@ export function ScriptEditor(props: ScriptEditorProps) {
         )}
 
         <div className={styles.linesScroll} ref={linesScrollRef}>
-          <div className={styles.lines}>
+          <div className={`${styles.lines} ${isResetting ? styles.linesResetting : ""}`}>
             {props.lines.map((line, i) => (
               <LineRow
                 key={line.id}

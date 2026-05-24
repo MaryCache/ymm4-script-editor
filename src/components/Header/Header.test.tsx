@@ -15,6 +15,9 @@ const baseProps = {
   onLoadYmscript: () => {},
   onLoadMarkdown: () => {},
   onCopyAll: () => {},
+  onOpenPasteImport: () => {},
+  onOpenResetAll: () => {},
+  canResetAll: true,
 };
 
 test("プロジェクト名が編集欄に表示される", () => {
@@ -105,4 +108,30 @@ test("ファイル読込: .md ファイルを選択すると onLoadMarkdown が 
   const file = new File(["# 台本"], "test.md", { type: "text/markdown" });
   await userEvent.upload(input, file);
   expect(onLoadMarkdown).toHaveBeenCalledWith(file);
+});
+
+// ===== v1.2 新規ボタンのテスト =====
+
+test("「コピペでインポート」クリックで onOpenPasteImport が呼ばれる", async () => {
+  const onOpenPasteImport = vi.fn();
+  render(<Header {...baseProps} onOpenPasteImport={onOpenPasteImport} />);
+  await userEvent.click(screen.getByRole("button", { name: "コピペでインポート" }));
+  expect(onOpenPasteImport).toHaveBeenCalled();
+});
+
+test("「全行リセット」クリックで onOpenResetAll が呼ばれる", async () => {
+  const onOpenResetAll = vi.fn();
+  render(<Header {...baseProps} onOpenResetAll={onOpenResetAll} canResetAll={true} />);
+  await userEvent.click(screen.getByRole("button", { name: "全行リセット" }));
+  expect(onOpenResetAll).toHaveBeenCalled();
+});
+
+test("canResetAll=false のとき「全行リセット」ボタンが disabled", () => {
+  render(<Header {...baseProps} canResetAll={false} />);
+  expect(screen.getByRole("button", { name: "全行リセット" })).toBeDisabled();
+});
+
+test("canResetAll=true のとき「全行リセット」ボタンが enabled", () => {
+  render(<Header {...baseProps} canResetAll={true} />);
+  expect(screen.getByRole("button", { name: "全行リセット" })).not.toBeDisabled();
 });

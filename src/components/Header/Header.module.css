@@ -189,6 +189,47 @@
   opacity: 0.9;
 }
 
+/* ===== コピペでインポートボタン (F-70) =====
+ * 全件コピーより控えめなセカンダリ寄りのスタイル。
+ * ホバーで cyan 系のグローを付与。
+ */
+.btnPasteImport {
+  composes: btn;
+}
+
+/* ===== 全行リセットボタン (F-100, F-104) =====
+ * 通常時は極めて控えめ（薄いグレー系 / text-2 で存在感を抑える）。
+ * ホバーで danger 系（red）に変化して破壊操作であることを示す。
+ * disabled: 0行時。
+ */
+.btnResetAll {
+  composes: btn;
+  /* 通常: 存在感を抑えた透明寄り */
+  background: transparent;
+  border-color: rgba(255, 255, 255, 0.08);
+  color: var(--text-2);
+  box-shadow: none;
+}
+.btnResetAll:hover:not(:disabled) {
+  /* danger 系: 赤みのグロー */
+  background: rgba(220, 53, 69, 0.12);
+  border-color: rgba(220, 53, 69, 0.45);
+  color: #f87171;
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, 0.04) inset,
+    0 4px 12px -6px rgba(220, 53, 69, 0.4);
+}
+.btnResetAll:focus-visible {
+  outline: 2px solid #dc3545;
+  outline-offset: 2px;
+}
+.btnResetAll:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+  transform: none;
+}
+
 /* ===== submenu-icon-rotate (item 5: hover-feedback-family / cygames-corporate)
  * 「保存▼」「読込▼」の ▼ を、メニューが開いている時に rotate(180deg) で反転。
  * transform rotate, 0.3s ease。

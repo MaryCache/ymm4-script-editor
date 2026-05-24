@@ -1,0 +1,177 @@
+/* ColorWheel.module.css
+ *
+ * 自前カラーピッカーのスタイル（依存ゼロ）。
+ * CharacterPanel の色ドット近傍にポップオーバーとして表示される。
+ *
+ * アニメーション（§4.7 dropdown-enter-right 相当）:
+ *   入場: opacity 0→1 + scale 0.96→1, 180ms, var(--ease-out)。
+ *   prefers-reduced-motion: reduce ではアニメーションなし。
+ */
+
+/* ===== コンテナ（ポップオーバー全体）===== */
+.container {
+  background: linear-gradient(180deg, var(--bg-3) 0%, var(--bg-2) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  width: 212px;
+  /* 入場アニメーション: dropdown-enter-right（opacity + scale 0.96→1） */
+  animation: dropdownEnter 0.18s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+  /* ポップオーバーが他の UI に隠れないよう z-index を設定 */
+  position: relative;
+  z-index: 500;
+}
+
+@keyframes dropdownEnter {
+  from {
+    opacity: 0;
+    transform: scale(0.96);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+/* prefers-reduced-motion: アニメーションなし */
+@media (prefers-reduced-motion: reduce) {
+  .container {
+    animation: none;
+  }
+}
+
+/* ===== 色相環ラッパー ===== */
+.wheelWrapper {
+  /* SVG の周囲に少し余白を確保してマーカーが欠けないようにする */
+  padding: 4px;
+  border-radius: 50%;
+  /* ドラッグ中の選択を防ぐ */
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.wheelSvg {
+  display: block;
+  touch-action: none; /* タッチデバイスのスクロールキャンセル */
+}
+
+/* ===== 明度スライダー行 ===== */
+.sliderRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sliderLabel {
+  color: var(--text-2);
+  font-size: 11px;
+  flex-shrink: 0;
+  width: 24px;
+  text-align: right;
+}
+
+.sliderValue {
+  color: var(--text-2);
+  font-size: 11px;
+  font-family: var(--font-mono);
+  width: 32px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* range input のスタイル: background は JS から sliderBg として注入する */
+.slider {
+  flex: 1;
+  min-width: 0;
+  height: 14px;
+  appearance: none;
+  -webkit-appearance: none;
+  border-radius: 7px;
+  outline: none;
+  cursor: pointer;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.slider:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* Thumb (Chrome/Safari) */
+.slider::-webkit-slider-thumb {
+  appearance: none;
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+.slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+/* Thumb (Firefox) */
+.slider::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: white;
+  border: 2px solid rgba(0, 0, 0, 0.2);
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+  cursor: grab;
+}
+
+/* ===== hex 入力行 ===== */
+.hexRow {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* 現在色のプレビュースウォッチ */
+.swatch {
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radius-sm);
+  flex-shrink: 0;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
+}
+
+/* hex テキスト入力 */
+.hexInput {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid var(--border-2);
+  border-radius: var(--radius-sm);
+  color: var(--text-0);
+  padding: 0 10px;
+  font-size: 12px;
+  font-family: var(--font-mono);
+  letter-spacing: 0.05em;
+  outline: none;
+  transition: border-color 140ms var(--ease-out), background 140ms;
+}
+
+.hexInput:focus {
+  border-color: rgba(16, 125, 200, 0.5);
+  background: rgba(16, 125, 200, 0.05);
+  box-shadow: 0 0 0 3px rgba(16, 125, 200, 0.08);
+}
+
+.hexInput:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}

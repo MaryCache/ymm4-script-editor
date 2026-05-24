@@ -210,3 +210,109 @@ test("moveLine down は末尾行に対して no-op", () => {
   act(() => result.current.moveLine(result.current.project.lines[1]!.id, "down"));
   expect(result.current.project.lines.map((l) => l.text)).toEqual(["A", "B"]);
 });
+
+// --- v1.2 mutators ---
+
+// renameCharacter
+test("renameCharacter はキャラクター名を変更する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.renameCharacter(id, "博麗霊夢"));
+  expect(result.current.project.characters[0]!.name).toBe("博麗霊夢");
+});
+
+test("renameCharacter: 空文字（trim後）は no-op で元の名前を維持する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.renameCharacter(id, "   "));
+  expect(result.current.project.characters[0]!.name).toBe("霊夢");
+});
+
+// setCharacterColor
+test("setCharacterColor はキャラクターの色を変更する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const id = result.current.project.characters[0]!.id;
+  act(() => result.current.setCharacterColor(id, "#123456"));
+  expect(result.current.project.characters[0]!.color).toBe("#123456");
+});
+
+// importPlainText
+test("importPlainText: 既存キャラありで3行テキストを末尾に追加し件数3を返す", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  const charId = result.current.project.characters[0]!.id;
+  let count = -1;
+  act(() => {
+    count = result.current.importPlainText("あいうえお\nかきくけこ\nさしすせそ");
+  });
+  expect(count).toBe(3);
+  expect(result.current.project.lines).toHaveLength(3);
+  expect(result.current.project.lines.every((l) => l.characterId === charId)).toBe(true);
+});
+
+test("importPlainText: キャラ0人のとき「キャラ1」が自動作成され2行追加・件数2を返す", () => {
+  const { result } = renderHook(() => useProject());
+  let count = -1;
+  act(() => {
+    count = result.current.importPlainText("あいうえお\nかきくけこ");
+  });
+  expect(count).toBe(2);
+  expect(result.current.project.characters).toHaveLength(1);
+  expect(result.current.project.characters[0]!.name).toBe("キャラ1");
+  expect(result.current.project.characters[0]!.color).toMatch(/^#[0-9A-Fa-f]{6}$/);
+  expect(result.current.project.lines).toHaveLength(2);
+  expect(result.current.project.lines.every((l) => l.characterId === result.current.project.characters[0]!.id)).toBe(
+    true,
+  );
+});
+
+test("importPlainText: 空行混じりテキストは空行をスキップしtrimされる", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  let count = -1;
+  act(() => {
+    count = result.current.importPlainText("a\n\n b \n");
+  });
+  expect(count).toBe(2);
+  expect(result.current.project.lines).toHaveLength(2);
+  expect(result.current.project.lines[0]!.text).toBe("a");
+  expect(result.current.project.lines[1]!.text).toBe("b");
+});
+
+test("importPlainText: 既存 lines がある場合は末尾に追加する（置換しない）", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.updateLineText(result.current.project.lines[0]!.id, "既存行"));
+  act(() => {
+    result.current.importPlainText("追加行");
+  });
+  expect(result.current.project.lines).toHaveLength(2);
+  expect(result.current.project.lines[0]!.text).toBe("既存行");
+  expect(result.current.project.lines[1]!.text).toBe("追加行");
+});
+
+test("importPlainText: 全部空行なら0を返し状態は変わらない", () => {
+  const { result } = renderHook(() => useProject());
+  let count = -1;
+  act(() => {
+    count = result.current.importPlainText("\n  \n\n");
+  });
+  expect(count).toBe(0);
+  expect(result.current.project.characters).toHaveLength(0);
+  expect(result.current.project.lines).toHaveLength(0);
+});
+
+// clearAllLines
+test("clearAllLines は全行を削除しキャラクターは保持する", () => {
+  const { result } = renderHook(() => useProject());
+  act(() => result.current.addCharacter("霊夢"));
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.addLineAtEnd());
+  act(() => result.current.clearAllLines());
+  expect(result.current.project.lines).toHaveLength(0);
+  expect(result.current.project.characters).toHaveLength(1);
+});

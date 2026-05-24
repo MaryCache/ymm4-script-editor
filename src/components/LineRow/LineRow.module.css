@@ -43,12 +43,18 @@
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* prefers-reduced-motion: stop entry animation */
+/* prefers-reduced-motion: stop entry animation and color transitions (§4.7) */
 @media (prefers-reduced-motion: reduce) {
   .row { animation: none; }
+  .row::before { transition: opacity 220ms var(--ease-out), transform 260ms var(--ease-out); }
+  .charSelectWrapper::before { transition: none; }
+  .charDot { transition: none; }
 }
 
-/* left accent bar: キャラ色を ::before で縦線として表示。ホバー/フォーカスで出現。 */
+/* left accent bar: キャラ色を ::before で縦線として表示。ホバー/フォーカスで出現。
+ * §4.7 色変更トランジション: background-color に .2s を付ける（--char が変わったとき）。
+ * prefers-reduced-motion: reduce では color transition も無効（下部 @media で制御）。
+ */
 .row::before {
   content: "";
   position: absolute;
@@ -59,7 +65,7 @@
   opacity: 0;
   transform: scaleY(0.4);
   transform-origin: center;
-  transition: opacity 220ms var(--ease-out), transform 260ms var(--ease-out);
+  transition: opacity 220ms var(--ease-out), transform 260ms var(--ease-out), background-color 0.2s var(--ease-out);
   pointer-events: none;
 }
 
@@ -118,7 +124,9 @@
   background: linear-gradient(180deg, rgba(14, 44, 66, 0.8), rgba(8, 33, 51, 0.8));
 }
 
-/* キャラ色の左バー — ::before で wrapper の左端に描画 */
+/* キャラ色の左バー — ::before で wrapper の左端に描画。
+ * §4.7 色変更トランジション: background-color / box-shadow に .2s を付ける。
+ */
 .charSelectWrapper::before {
   content: "";
   width: 3px;
@@ -127,6 +135,7 @@
   background: var(--char, var(--text-4));
   box-shadow: 0 0 12px var(--char, transparent);
   border-radius: var(--radius-sm) 0 0 var(--radius-sm);
+  transition: background-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 
 /* ===== トグルボタン (item 4) =====
@@ -158,13 +167,16 @@
   border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
 }
 
-/* 色ドット: 小さな丸でキャラ色を示す */
+/* 色ドット: 小さな丸でキャラ色を示す。
+ * §4.7 色変更トランジション: background-color / box-shadow に .2s を付ける。
+ */
 .charDot {
   width: 8px; height: 8px;
   border-radius: 50%;
   flex-shrink: 0;
   display: inline-block;
   box-shadow: 0 0 6px currentColor;
+  transition: background-color 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 
 /* キャラ名テキスト */

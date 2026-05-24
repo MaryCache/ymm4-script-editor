@@ -1,10 +1,12 @@
-import { useCallback } from "react";
+import { useCallback, useState } from "react";
 import { useProject } from "./hooks/useProject";
 import { Header } from "./components/Header/Header";
 import { CharacterPanel } from "./components/CharacterPanel/CharacterPanel";
 import { ScriptEditor } from "./components/ScriptEditor/ScriptEditor";
 import { BgCanvas } from "./components/BgCanvas/BgCanvas";
 import { OpeningOverlay } from "./components/OpeningOverlay/OpeningOverlay";
+import { PasteImportModal } from "./components/PasteImportModal";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { buildLineCSV } from "./utils/csv";
 import type { Line } from "./types";
 import styles from "./App.module.css";
@@ -38,6 +40,8 @@ export default function App() {
     setProjectName,
     addCharacter,
     deleteCharacter,
+    renameCharacter,
+    setCharacterColor,
     addLineAtEnd,
     addLineAfter,
     deleteLine,
@@ -50,7 +54,48 @@ export default function App() {
     exportMarkdown,
     importMarkdown: importMd,
     exportCSVToClipboard,
+    importPlainText,
+    clearAllLines,
   } = useProject();
+
+  // ===== モーダル開閉状態 =====
+  const [pasteImportOpen, setPasteImportOpen] = useState(false);
+  const [resetConfirmOpen, setResetConfirmOpen] = useState(false);
+
+  // ===== 全行リセット退場アニメーション (§4.7) =====
+  // isResetting: true の間 ScriptEditor の .lines に fadeout クラスを付与。
+  // prefers-reduced-motion: reduce では 即時クリア（タイマー不要）。
+  const [isResetting, setIsResetting] = useState(false);
+
+  const handleOpenPasteImport = useCallback(() => setPasteImportOpen(true), []);
+  const handleClosePasteImport = useCallback(() => setPasteImportOpen(false), []);
+
+  const handleOpenResetAll = useCallback(() => setResetConfirmOpen(true), []);
+  const handleCloseResetAll = useCallback(() => setResetConfirmOpen(false), []);
+
+  // コピペインポート実行: n行追加を alert で通知（n=0 は何もしない）
+  const handleImportPlainText = useCallback(
+    (text: string) => {
+      const n = importPlainText(text);
+      if (n > 0) alert(`${n} 行を取り込みました。`);
+    },
+    [importPlainText],
+  );
+
+  // 全行リセット確定: prefers-reduced-motion に応じて即時 or フェードアウト後にクリア
+  const handleConfirmReset = useCallback(() => {
+    const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    if (reduced) {
+      clearAllLines();
+      return;
+    }
+    // フェードアウト (~220ms) してから clearAllLines
+    setIsResetting(true);
+    window.setTimeout(() => {
+      clearAllLines();
+      setIsResetting(false);
+    }, 230);
+  }, [clearAllLines]);
 
   // copyLine は characters が変わった時のみ再生成。テキスト編集では characters 参照は不変なので、
   // 毎打鍵で LineRow が再描画されることはない（NF-10 維持）。
@@ -144,8 +189,17 @@ export default function App() {
           onLoadYmscript={loadYmscript}
           onLoadMarkdown={importMarkdown}
           onCopyAll={onCopyAll}
+          onOpenPasteImport={handleOpenPasteImport}
+          onOpenResetAll={handleOpenResetAll}
+          canResetAll={project.lines.length > 0}
         />
-        <CharacterPanel characters={project.characters} onAdd={addCharacter} onDelete={deleteCharacter} />
+        <CharacterPanel
+          characters={project.characters}
+          onAdd={addCharacter}
+          onDelete={deleteCharacter}
+          onRename={renameCharacter}
+          onColorChange={setCharacterColor}
+        />
         <ScriptEditor
           characters={project.characters}
           lines={project.lines}
@@ -157,8 +211,24 @@ export default function App() {
           onAddAfter={addLineAfter}
           onDelete={deleteLine}
           onCopy={copyLine}
+          isResetting={isResetting}
         />
       </div>
+
+      {/* ===== コピペインポートモーダル ===== */}
+      <PasteImportModal open={pasteImportOpen} onClose={handleClosePasteImport} onImport={handleImportPlainText} />
+
+      {/* ===== 全行リセット確認ダイアログ ===== */}
+      <ConfirmDialog
+        open={resetConfirmOpen}
+        title="全行をリセットしますか？"
+        message="すべてのセリフ行が削除されます。この操作は元に戻せません。"
+        confirmLabel="リセット"
+        cancelLabel="キャンセル"
+        danger
+        onConfirm={handleConfirmReset}
+        onClose={handleCloseResetAll}
+      />
     </>
   );
 }

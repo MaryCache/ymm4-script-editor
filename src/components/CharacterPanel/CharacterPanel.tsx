@@ -1,6 +1,7 @@
 // src/components/CharacterPanel/CharacterPanel.tsx
-import { useState, useCallback, type ChangeEvent } from "react";
+import { useState, useCallback, useRef, type ChangeEvent, type KeyboardEvent } from "react";
 import type { Character } from "../../types";
+import { ColorWheel } from "../ColorWheel";
 import styles from "./CharacterPanel.module.css";
 
 /**
@@ -27,21 +28,49 @@ export type CharacterPanelProps = {
    * @param id - 削除対象のキャラクター ID
    */
   onDelete: (id: string) => void;
+  /**
+   * キャラクター名変更要求のコールバック。
+   *
+   * @remarks
+   * `useProject.renameCharacter` の安定参照をそのまま渡してよい。
+   * trim 後が空文字の場合は呼び出し元（UI 側）と `useProject` 側の両方で no-op 保証。
+   *
+   * @param id - 変更対象のキャラクター ID
+   * @param name - 新しいキャラクター名
+   */
+  onRename: (id: string, name: string) => void;
+  /**
+   * キャラクターカラー変更要求のコールバック。
+   *
+   * @remarks
+   * `useProject.setCharacterColor` の安定参照をそのまま渡してよい。
+   * `ColorWheel.onChange` から即時転送されるため、ドラッグ中も逐次反映される。
+   *
+   * @param id - 変更対象のキャラクター ID
+   * @param color - 新しい CSS hex カラー（例: `"#ff6b6b"`）
+   */
+  onColorChange: (id: string, color: string) => void;
 };
 
 /**
- * キャラクター一覧の表示・追加・削除を担うサイドパネルコンポーネント。
+ * キャラクター一覧の表示・追加・削除・名前編集・色変更を担うサイドパネルコンポーネント。
  *
  * @remarks
  * - キャラクター名入力フォームと一覧リストを持つ。
  * - 最後の1キャラクターは削除ボタンが `disabled` になる（孤児 Line 防止）。
  * - 削除時は CSS アニメーション（退場スライド）を再生してから `onDelete` を呼ぶ。
+ * - 名前をダブルクリックするとインライン編集モードに切り替わる（local state: `editingId`）。
+ *   - Enter / blur で確定 → `onRename(id, value)`（trim 後が空なら no-op で編集解除）。
+ *   - Esc でキャンセル（元の名前に戻る）。
+ * - 色ドットを `<button>` 化し、クリックで `ColorWheel` ポップオーバーを表示（local state: `colorEditingId`、排他）。
+ *   - `ColorWheel.onChange` で `onColorChange(id, hex)` を即時転送。
+ *   - `ColorWheel.onClose` で `colorEditingId` を解除。
  * - `prefers-reduced-motion: reduce` 時は即時削除（アニメーションスキップ）。
  * - フッターは装飾専用（`aria-hidden`）でスクリーンリーダーには読まれない。
  *
  * @param props - {@link CharacterPanelProps}
  */
-export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelProps) {
+export function CharacterPanel({ characters, onAdd, onDelete, onRename, onColorChange }: CharacterPanelProps) {
   const [name, setName] = useState("");
   // 最後の1キャラは削除不可（孤児 Line 防止。useProject.deleteCharacter と同じ制約を UI でも保証）。
   const canDelete = characters.length > 1;
@@ -91,6 +120,66 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
     setName("");
   };
 
+  // ===== 名前インライン編集 (§2.2 / F-80-82) =====
+  // editingId: 現在編集中のキャラ ID（null = 編集していない）。
+  // editValue: 編集中の一時テキスト（確定まで onRename を呼ばない）。
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+
+  /** 名前 span のダブルクリックで編集モードに入る。 */
+  const startEdit = useCallback((id: string, currentName: string) => {
+    setEditingId(id);
+    setEditValue(currentName);
+  }, []);
+
+  /** Enter / blur で確定。trim 後が空なら no-op（編集解除のみ）。 */
+  const commitEdit = useCallback(
+    (id: string, value: string) => {
+      setEditingId(null);
+      const trimmed = value.trim();
+      if (trimmed !== "") {
+        onRename(id, trimmed);
+      }
+      // 空文字の場合は表示が元の名前に戻る（characters が変わらないため）。
+    },
+    [onRename],
+  );
+
+  /** Esc でキャンセル（元の名前表示に戻す）。 */
+  const cancelEdit = useCallback(() => {
+    setEditingId(null);
+  }, []);
+
+  const handleEditKeyDown = useCallback(
+    (e: KeyboardEvent<HTMLInputElement>, id: string) => {
+      if (e.key === "Enter") {
+        e.preventDefault();
+        commitEdit(id, editValue);
+      } else if (e.key === "Escape") {
+        e.preventDefault();
+        cancelEdit();
+      }
+    },
+    [commitEdit, cancelEdit, editValue],
+  );
+
+  // ===== 色変更（§2.3 / F-90-93）=====
+  // colorEditingId: ColorWheel を表示中のキャラ ID（null = 非表示）。
+  // 開けるのは1つのみ（排他）。
+  const [colorEditingId, setColorEditingId] = useState<string | null>(null);
+
+  const openColorWheel = useCallback((id: string) => {
+    setColorEditingId(id);
+  }, []);
+
+  const closeColorWheel = useCallback(() => {
+    setColorEditingId(null);
+  }, []);
+
+  // ポップオーバー位置のアンカー: 各ドットボタンの ref を id → ref のマップで管理する。
+  // useRef で Map を保持（レンダリングをトリガーしない）。
+  const dotRefs = useRef<Map<string, HTMLButtonElement | null>>(new Map());
+
   return (
     <aside className={styles.sidebar}>
       {/* ===== Panel header ===== */}
@@ -133,20 +222,65 @@ export function CharacterPanel({ characters, onAdd, onDelete }: CharacterPanelPr
             ? `${styles.charItem} ${styles.charItemRemoving}`
             : `${styles.charItem} ${styles.charItemEnter}`;
 
+          const isEditingName = editingId === c.id;
+          const isColorOpen = colorEditingId === c.id;
+
           return (
             <li key={c.id} className={itemClass}>
-              {/* カラードット: style で直接キャラ色を注入。--c-glow はアルファ付きで同色グロー。 */}
-              <span
-                className={styles.dot}
-                style={{
-                  background: c.color,
-                  // Why: グロー色は同じ hex にアルファを乗せた近似値。
-                  // CSS の color-mix() は Baseline 2023 でまだ一部ブラウザ非対応のため inline 変数で対応。
-                  ["--c-glow" as string]: c.color + "80",
-                }}
-                aria-hidden="true"
-              />
-              <span className={styles.name}>{c.name}</span>
+              {/* ===== 色ドット → button 化（§2.3）===== */}
+              {/* aria-label にキャラ名を含め、目的を明示する。 */}
+              {/* position: relative でポップオーバーのアンカーにする。 */}
+              <span className={styles.dotWrapper}>
+                <button
+                  ref={(el) => {
+                    dotRefs.current.set(c.id, el);
+                  }}
+                  type="button"
+                  className={styles.dotBtn}
+                  aria-label={`${c.name} の色を変更`}
+                  style={{
+                    background: c.color,
+                    // グロー色は同じ hex にアルファを乗せた近似値（CSS color-mix() は未対応環境があるため inline 変数）。
+                    ["--c-glow" as string]: c.color + "80",
+                  }}
+                  onClick={() => openColorWheel(c.id)}
+                />
+                {/* ColorWheel ポップオーバー: ドットボタンの近傍に絶対配置 */}
+                {isColorOpen && (
+                  <div className={styles.colorPopover}>
+                    <ColorWheel
+                      color={c.color}
+                      onChange={(hex) => onColorChange(c.id, hex)}
+                      onClose={closeColorWheel}
+                    />
+                  </div>
+                )}
+              </span>
+
+              {/* ===== キャラ名: 通常表示 / インライン編集切り替え（§2.2）===== */}
+              {isEditingName ? (
+                /* 編集中: <input> を表示。オートフォーカス＆テキスト全選択。 */
+                <input
+                  className={styles.nameInput}
+                  aria-label="キャラクター名を編集"
+                  value={editValue}
+                  autoFocus
+                  onFocus={(e) => e.currentTarget.select()}
+                  onChange={(e: ChangeEvent<HTMLInputElement>) => setEditValue(e.target.value)}
+                  onBlur={() => commitEdit(c.id, editValue)}
+                  onKeyDown={(e) => handleEditKeyDown(e, c.id)}
+                />
+              ) : (
+                /* 通常: <span> をダブルクリックで編集モードへ。 */
+                <span
+                  className={styles.name}
+                  onDoubleClick={() => startEdit(c.id, c.name)}
+                  title="ダブルクリックで名前を編集"
+                >
+                  {c.name}
+                </span>
+              )}
+
               {/* deleteButton クラスで破壊操作の視覚的アフォーダンス（--danger）を提供する。 */}
               <button
                 className={styles.del}

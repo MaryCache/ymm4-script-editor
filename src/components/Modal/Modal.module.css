@@ -1,0 +1,72 @@
+/* Modal.module.css
+ *
+ * 汎用モーダル基盤のスタイル。
+ * PasteImportModal / ConfirmDialog の共通オーバーレイ・パネル・アニメーションを提供する。
+ *
+ * z-index 設計:
+ *   OpeningOverlay: 9999（最前面）
+ *   Modal overlay: 1000（UI より上、OpeningOverlay より下）
+ *
+ * アニメーション（§4.7 modal-family）:
+ *   オーバーレイ: backdrop-fade（opacity 0→1, 180ms, ease-out）
+ *   パネル: modal-rise-in（translateY 8px→0 + opacity + scale 0.98→1, 280ms, var(--ease-out)）
+ *
+ * prefers-reduced-motion: reduce では即時表示 / opacity のみに簡素化。
+ */
+
+/* ===== オーバーレイ（backdrop） ===== */
+.overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: grid;
+  place-items: center;
+  /* 半透明黒 + blur でコンテンツを背後に残しながらモーダルを際立たせる */
+  background: rgba(0, 8, 16, 0.72);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  /* backdrop-fade: opacity 0→1, 180ms */
+  animation: backdropFade 0.18s ease-out both;
+}
+
+@keyframes backdropFade {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+/* ===== パネル（ダイアログ本体） ===== */
+.panel {
+  background: linear-gradient(180deg, var(--bg-2) 0%, var(--bg-1) 100%);
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-pop), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+  width: min(480px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  /* modal-rise-in: translateY 8px→0 + opacity + scale 0.98→1, 280ms, var(--ease-out) */
+  animation: modalRiseIn 0.28s var(--ease-out, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+
+@keyframes modalRiseIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* prefers-reduced-motion: reduce — 即時表示（アニメーションなし） */
+@media (prefers-reduced-motion: reduce) {
+  .overlay {
+    animation: none;
+  }
+  .panel {
+    animation: none;
+  }
+}
